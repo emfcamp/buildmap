@@ -2,6 +2,7 @@ import datetime
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 
 import map
@@ -42,13 +43,26 @@ def fileLayers(filename):
 
 def makeShapeFiles(sourceFile, layerName, outputTemplate):
 	if sourceFile.lower()[-4:] == ".dxf":
+		output = []
 		for (type, suffix) in [('POINT', 'points'), ('LINESTRING', 'lines'), ('POLYGON', 'areas')]:
 			filename = "%s-%s.shp" % (outputTemplate, suffix)
-			print "Generating shapefile '%s'..." % filename
-			os.system("ogr2ogr -skipfailures -where \"LAYER = '%s'\" '%s' '%s' -nlt %s 2>/dev/null" % (layerName, filename, sourceFile, type))
+			output.append("echo Generating shapefile '%s'...; ogr2ogr -skipfailures -where \"LAYER = '%s'\" '%s' '%s' -nlt %s 2>/dev/null" % (filename, layerName, filename, sourceFile, type))
+		return output
 	else:
 		raise Exception("Unsupported source file format: '%s'" % sourceFile)
+	
 
+def runCommands(commands):
+	processes = {}
+	while len(commands) > 0 or len(processes) > 0:
+		if len(commands) > 0 and len(processes) < config.threads:
+			process = subprocess.Popen(commands[0], shell = True)
+			del commands[0]
+			processes[process.pid] = process
+		if len(commands) == 0 or len(processes) >= config.threads:
+			(pid, status) = os.wait()
+			if pid in processes:
+				del processes[pid]
 
 mapDir = tempfile.mkdtemp("-buildmap")
 os.chdir(mapDir)
@@ -62,6 +76,8 @@ mapFile = map.header()
 tilecacheFile = tilecache.header(tempTilesDir)
 htmlFile = html.header()
 
+
+commands = []
 for layerName in layers.layers:
 	layer = layers.layers[layerName]
 	mapLayers = []
@@ -72,12 +88,13 @@ for layerName in layers.layers:
 		for sourceLayer in fileLayers(sourcePath):
 			if re.match(layerPattern + "$", sourceLayer):
 				filename = "%s-%s" % (sanitize(sourceFile), sanitize(sourceLayer))
-				makeShapeFiles(sourcePath, sourceLayer, filename)
+				commands += makeShapeFiles(sourcePath, sourceLayer, filename)
 				mapLayer = sanitize(sourceLayer)
 				mapLayers.append(mapLayer)
 				mapFile += map.layer(mapLayer, filename, sourceLayer)
 	tilecacheFile += tilecache.layer(layerName, mapLayers, mapDir)
 	htmlFile += html.layer(layerName, layerName)
+runCommands(commands)
 
 mapFile += map.footer()
 tilecacheFile += tilecache.footer()
@@ -96,12 +113,15 @@ tilecacheStream.close()
 for filename in config.mapExtraFiles:
 	shutil.copy(filename, ".")
 
-print "Generating tiles..."
+commands = []
 for layerName in layers.layers:
-	os.system("tilecache_seed.py '%s' %s" % (layerName, len(config.resolutions)))
+	commands.append("tilecache_seed.py '%s' %s" % (layerName, len(config.resolutions)))
+print "Generating tiles..."
+runCommands(commands)
 
 shutil.rmtree(oldTilesDir, True)
-shutil.move(tilesDir, oldTilesDir)
+if os.path.exists(tilesDir):
+	shutil.move(tilesDir, oldTilesDir)
 shutil.move(tempTilesDir, tilesDir)
 
 print "Writing 'index.html'..."
