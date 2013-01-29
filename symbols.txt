@@ -1,0 +1,55 @@
+SYMBOLSET
+SYMBOL
+   NAME "circle"
+   TYPE ellipse
+   FILLED true
+   POINTS 1 1 END
+END
+SYMBOL
+   NAME "square"
+   TYPE vector
+   FILLED true
+   POINTS  0 1 0 0 1 0 1 1 0 1 END
+END
+SYMBOL
+   NAME "cross"
+   TYPE vector
+   POINTS  2 0 2 4 -99 -99 0 2 4 2 END
+END
+SYMBOL
+   NAME "triangle"
+   TYPE vector
+   FILLED true
+   POINTS  0 1 .5 0 1 1  0 1 END
+END
+SYMBOL
+   NAME "fill_horizontal"
+   TYPE vector
+   POINTS 0 6 6 6 END
+END
+SYMBOL
+   NAME "fill_vertical"
+   TYPE vector
+   POINTS 6 0 6 6 END
+END
+SYMBOL
+   NAME "fill_cross"
+   TYPE vector
+   POINTS 3 0 3 6 -99 -99 0 3 6 3 END
+END
+SYMBOL
+   NAME "fill_upwarddiagonal"
+   TYPE vector
+   POINTS 0 0 6 6 END
+END
+SYMBOL
+   NAME "fill_downwarddiagonal"
+   TYPE vector
+   POINTS 0 14 14 0 END
+END
+SYMBOL
+   NAME "fill_crossdiagonal"
+   TYPE vector
+   POINTS 0 0 6 6 -99 -99 0 6 6 0 END
+END
+END
