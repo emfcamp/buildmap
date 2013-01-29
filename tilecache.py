@@ -1,19 +1,19 @@
 import config
 
-def header():
+def header(cacheDirectory):
 	return """
 [cache]
 type=Disk
 base=%s
 
-""" % config.cacheDirectory
+""" % cacheDirectory
 
-def layer(name, mapFileLayers):
+def layer(name, mapFileLayers, mapDirectory):
 	return """
 [%s]
 type=MapServerLayer
 layers=%s
-mapfile=%s/ohm.map
+mapfile=ohm.map
 debug=on
 extension=png
 resolutions=%s
@@ -21,7 +21,7 @@ srs=EPSG:28992
 bbox=%s
 
 
-""" % (name, ",".join(mapFileLayers), config.mapDirectory, ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.extents)))
+""" % (name, ",".join(mapFileLayers), ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.extents)))
 
 def footer():
 	return ""

@@ -2,6 +2,7 @@ import datetime
 import os
 import re
 import shutil
+import tempfile
 
 import map
 import tilecache
@@ -49,18 +50,16 @@ def makeShapeFiles(sourceFile, layerName, outputTemplate):
 		raise Exception("Unsupported source file format: '%s'" % sourceFile)
 
 
-mapDir = config.mapDirectory
-while len(mapDir) > 1 and mapDir[-1:] == '/':
-	mapDir = mapDir[:-1]
+mapDir = tempfile.mkdtemp("-buildmap")
+os.chdir(mapDir)
 
-tempMapDir = "%s-%s" % (mapDir, datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
-os.mkdir(tempMapDir)
-os.chdir(tempMapDir)
-
+tilesDir = config.wwwDirectory + "/tiles"
+tempTilesDir = tilesDir + "-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+oldTilesDir = tilesDir + "-old"
 
 
 mapFile = map.header()
-tilecacheFile = tilecache.header()
+tilecacheFile = tilecache.header(tempTilesDir)
 htmlFile = html.header()
 
 for layerName in layers.layers:
@@ -77,7 +76,7 @@ for layerName in layers.layers:
 				mapLayer = sanitize(sourceLayer)
 				mapLayers.append(mapLayer)
 				mapFile += map.layer(mapLayer, filename, sourceLayer)
-	tilecacheFile += tilecache.layer(layerName, mapLayers)
+	tilecacheFile += tilecache.layer(layerName, mapLayers, mapDir)
 	htmlFile += html.layer(layerName, layerName)
 
 mapFile += map.footer()
@@ -90,28 +89,26 @@ mapStream.write(mapFile)
 mapStream.close()
 
 print "Generating 'tilecache.cfg'..."
-tilecacheStream = open(config.wwwDirectory + '/tilecache/tilecache.cfg', 'w')
+tilecacheStream = open('tilecache.cfg', 'w')
 tilecacheStream.write(tilecacheFile)
 tilecacheStream.close()
-
-print "Generating 'index.html'..."
-htmlStream = open(config.wwwDirectory + '/index.html', 'w')
-htmlStream.write(htmlFile)
-htmlStream.close()
-
 
 for filename in config.mapExtraFiles:
 	shutil.copy(filename, ".")
 
-os.chdir("..")
-shutil.rmtree(mapDir, True)
-shutil.move(tempMapDir, mapDir)
-
-shutil.rmtree(config.cacheDirectory, True)
-
-os.chdir(config.wwwDirectory)
-os.chdir("tilecache")
-
+print "Generating tiles..."
 for layerName in layers.layers:
-	#os.system("./tilecache_seed.py '%s' 0 %s" % (layerName, len(config.resolutions)))
-	pass
+	os.system("tilecache_seed.py '%s' %s" % (layerName, len(config.resolutions)))
+
+shutil.rmtree(oldTilesDir, True)
+shutil.move(tilesDir, oldTilesDir)
+shutil.move(tempTilesDir, tilesDir)
+
+print "Writing 'index.html'..."
+htmlStream = open(config.wwwDirectory + '/index.html', 'w')
+htmlStream.write(htmlFile)
+htmlStream.close()
+
+os.chdir("/")
+shutil.rmtree(mapDir, True)
+shutil.rmtree(oldTilesDir, True)

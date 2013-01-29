@@ -1,14 +1,8 @@
 # Searched for map files.
 directories = ['/home/redlizard/ohm/terrain/']
 
-# Target location of the map data.
-mapDirectory = '/home/redlizard/ohm/terrain/buildmap/map'
-
 # Location of the webroot directory.
 wwwDirectory = '/home/redlizard/ohm/terrain/buildmap/www'
-
-# Tilecache cache directory.
-cacheDirectory = '/tmp/tilecache'
 
 # Stuff that is copied verbatim into the map data directory.
 mapExtraFiles = ['/home/redlizard/ohm/terrain/buildmap/fonts.txt', '/home/redlizard/ohm/terrain/buildmap/symbols.txt']
@@ -23,8 +17,8 @@ extents = (106831.040, 518050.240, 113712.320, 524931.520)
 
 
 # Map resolutions.
-resolutions = [26.880, 13.440, 6.720, 3.360, 1.680, 0.840, 0.420, 0.210, 0.105]
-#resolutions = [53.760, 26.880, 13.440, 6.720, 3.360, 1.680, 0.840, 0.420]
+#resolutions = [26.880, 13.440, 6.720, 3.360, 1.680, 0.840, 0.420, 0.210, 0.105]
+resolutions = [26.880, 13.440, 6.720, 3.360, 1.680, 0.840, 0.420]
 #resolutions = [3440.640, 1720.320, 860.160, 430.080, 215.040, 107.520, 53.760, 26.880, 13.440, 6.720, 3.360, 1.680, 0.840, 0.420, 0.210, 0.105]
 
 # 3440.640:  -285401.920, 22598.080, 595401.920, 903401.920

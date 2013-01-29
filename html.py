@@ -4,7 +4,6 @@ def header():
 	return """<!DOCTYPE html>
 <html>
   <head>
-    <!-- CACHING VERSION BY GMC -->
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -26,7 +25,7 @@ def header():
      #map {
         width: 100%;
         height: 100%;
-     } 
+     }
     </style>
     <script type="text/javascript">
         var map, layer
@@ -95,8 +94,7 @@ def layer(name, title):
 	return """
             , new OpenLayers.Layer.TileCache(
                 '%s',
-                //'%s/tilecache',
-                'http://floep.redlizard.nl/tilecache/',
+                '%s/tiles',
                 '%s',
                 {
                     singleTile:false,
@@ -107,21 +105,6 @@ def layer(name, title):
                 }
             )
 """ % (title, config.url, name, ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.extents)))
-	return """
-            , new OpenLayers.Layer.WMS(
-                '%s',
-                '%s/tilecache/tilecache.cgi',
-                {
-                    transparent:true, format: "image/png",
-                    layers: '%s'
-                },
-                {
-                    singleTile:false,
-                    //resolutions: [%s],
-                    //maxExtent: new OpenLayers.Bounds(%s),
-                }
-            )
-""" % (title, config.url, name, ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.extents)))
 
 
 def footer():
