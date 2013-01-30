@@ -78,20 +78,35 @@ htmlFile = html.header()
 
 
 commands = []
-for layerName in layers.layers:
-	layer = layers.layers[layerName]
+for (layerName, layer) in layers.layers:
 	mapLayers = []
-	for (sourceFile, layerPattern) in layer:
-		sourcePath = findFile(sourceFile)
+	for component in layer:
+		sourcePath = findFile(component['file'])
 		if sourcePath == None:
-			raise Exception("Couldn't find souce file '%s'" % sourceFile)
+			raise Exception("Couldn't find souce file '%s'" % component['file'])
 		for sourceLayer in fileLayers(sourcePath):
-			if re.match(layerPattern + "$", sourceLayer):
-				filename = "%s-%s" % (sanitize(sourceFile), sanitize(sourceLayer))
+			match = False
+			for regex in component['layers']:
+				if re.match(regex + "$", sourceLayer):
+					match = True
+					break
+			if match:
+				filename = "%s-%s" % (sanitize(component['file']), sanitize(sourceLayer))
 				commands += makeShapeFiles(sourcePath, sourceLayer, filename)
 				mapLayer = sanitize(sourceLayer)
-				mapLayers.append(mapLayer)
-				mapFile += map.layer(mapLayer, filename, sourceLayer)
+				
+				if 'color' in component:
+					identifier = mapLayer + "-lines"
+					mapFile += map.lineLayer(identifier, filename, sourceLayer, component['color'], component['width'])
+					mapLayers.append(identifier)
+				if 'fill' in component:
+					identifier = mapLayer + "-areas"
+					mapFile += map.areaLayer(identifier, filename, sourceLayer, component['fill'])
+					mapLayers.append(identifier)
+				if 'text' in component:
+					identifier = mapLayer + "-points"
+					mapFile += map.pointLayer(identifier, filename, sourceLayer, component['text'], component['fontSize'])
+					mapLayers.append(identifier)
 	tilecacheFile += tilecache.layer(layerName, mapLayers, mapDir)
 	htmlFile += html.layer(layerName, layerName)
 runCommands(commands)
@@ -114,7 +129,7 @@ for filename in config.mapExtraFiles:
 	shutil.copy(filename, ".")
 
 commands = []
-for layerName in layers.layers:
+for (layerName, layer) in layers.layers:
 	commands.append("tilecache_seed.py '%s' %s" % (layerName, len(config.resolutions)))
 print "Generating tiles..."
 runCommands(commands)

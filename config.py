@@ -1,5 +1,5 @@
 # Searched for map files.
-directories = ['/home/redlizard/ohm/terrain/']
+directories = ['/home/redlizard/ohm/terrain/ohm-gis/']
 
 # Location of the webroot directory.
 wwwDirectory = '/home/redlizard/ohm/terrain/buildmap/www'

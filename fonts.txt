@@ -1,4 +1,4 @@
-arial                           /usr/share/fonts/truetype/msttcorefonts/arial.ttf 
+arial                           /usr/share/fonts/truetype/msttcorefonts/arial.ttf
 arial-bold                      /usr/share/fonts/truetype/msttcorefonts/arialbd.ttf
 arialbold                       /usr/share/fonts/truetype/msttcorefonts/arialbd.ttf
 arial-italic                    /usr/share/fonts/truetype/msttcorefonts/ariali.ttf

@@ -76,31 +76,88 @@ MAP
   END
 """
 
-def layer(name, shapefile, description):
+def parseColor(color):
+	red = int(color[0:2], 16)
+	green = int(color[2:4], 16)
+	blue = int(color[4:6], 16)
+	if len(color) > 6:
+		alpha = int(color[6:8], 16)
+	else:
+		alpha = 255
+	return (red, green, blue, int(alpha * 100 / 255.0))
+
+def lineLayer(name, shapefile, description, color, width):
+	(red, green, blue, alpha) = parseColor(color)
 	return """
   LAYER
     NAME '%s'
     TYPE LINE
-    DUMP true
     DATA '%s-lines'
-    METADATA
-      'ows_title' '%s'
-    END
     STATUS ON
-    TRANSPARENCY 100
+    TRANSPARENCY %s
     PROJECTION
         "init=epsg:28992"
     END
     CLASS
        NAME '%s'
        STYLE
-         WIDTH 0.91 
-         OUTLINECOLOR 0 0 0
-         COLOR 255 0 0
+         WIDTH %s
+         COLOR %s %s %s
        END
     END
   END
-""" % (name, shapefile, name, description)
+""" % (name, shapefile, alpha, description, width, red, green, blue)
+
+def areaLayer(name, shapefile, description, color):
+	(red, green, blue, alpha) = parseColor(color)
+	return """
+  LAYER
+    NAME '%s'
+    TYPE POLYGON
+    DATA '%s-areas'
+    STATUS ON
+    TRANSPARENCY %s
+    PROJECTION
+        "init=epsg:28992"
+    END
+    CLASS
+       NAME '%s'
+       STYLE
+         COLOR %s %s %s
+       END
+    END
+  END
+""" % (name, shapefile, alpha, description, red, green, blue)
+
+def pointLayer(name, shapefile, description, color, size):
+	(red, green, blue, alpha) = parseColor(color)
+	return """
+  LAYER
+    NAME '%s'
+    TYPE POINT
+    DATA '%s-points'
+    STATUS ON
+    TRANSPARENCY %s
+    PROJECTION
+        "init=epsg:28992"
+    END
+    LABELITEM 'Text'
+    SYMBOLSCALEDENOM 2500
+    CLASS
+      NAME '%s'
+      LABEL
+        FONT arial
+        TYPE truetype
+        SIZE %s
+        COLOR %s %s %s
+        POSITION lr
+        FORCE true
+        ANTIALIAS true
+        PARTIALS true
+      END
+    END
+  END
+""" % (name, shapefile, alpha, description, size, red, green, blue)
 
 def footer():
 	return """
