@@ -19,6 +19,7 @@ extension=png
 resolutions=%s
 srs=EPSG:28992
 bbox=%s
+size=1024,1024
 
 
 """ % (name, ",".join(mapFileLayers), ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.extents)))

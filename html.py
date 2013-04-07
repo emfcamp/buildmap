@@ -101,6 +101,7 @@ def layer(name, title):
                     resolutions: [%s],
                     serverResolutions: [%s],
                     maxExtent: new OpenLayers.Bounds(%s),
+                    tileSize: new OpenLayers.Size(1024, 1024),
                     isBaseLayer: false,
                 }
             )
