@@ -153,7 +153,7 @@ def pointLayer(name, shapefile, description, color, size):
         POSITION lr
         FORCE true
         ANTIALIAS true
-        PARTIALS true
+        PARTIALS false
       END
     END
   END
