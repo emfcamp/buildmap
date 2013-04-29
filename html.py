@@ -67,7 +67,8 @@ def header():
                 {
                     singleTile:false,
                     isBaseLayer:true,
-                    attribution:'Kaartgegevens: TODO '
+                    attribution:'Kaartgegevens: TODO ',
+                    transitionEffect:'resize',
                 }
             );
 
@@ -83,14 +84,15 @@ def header():
                 format: 'image/png8',
                 matrixSet: 'EPSG:28992',
                 matrixIds: matrixIds,
-                isBaseLayer: true}
-            );
+                isBaseLayer: true,
+                //transitionEffect:'resize',
+            });
 
             map.addLayers([nlr, brt
 """
 
 
-def layer(name, title):
+def layer(name, title, enabled):
 	return """
             , new OpenLayers.Layer.TileCache(
                 '%s',
@@ -103,9 +105,11 @@ def layer(name, title):
                     maxExtent: new OpenLayers.Bounds(%s),
                     tileSize: new OpenLayers.Size(1024, 1024),
                     isBaseLayer: false,
+                    visibility: %s,
+                    //transitionEffect: 'map-resize',
                 }
             )
-""" % (title, config.url, name, ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.extents)))
+""" % (title, config.url, name, ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.extents)), 'true' if enabled else 'false')
 
 
 def footer():

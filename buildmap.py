@@ -75,12 +75,13 @@ oldTilesDir = tilesDir + "-old"
 mapFile = map.header()
 tilecacheFile = tilecache.header(tempTilesDir)
 htmlFile = html.header()
+layersDefFile = ''
 
 
 commands = []
-for (layerName, layer) in layers.layers:
+for layer in layers.layers:
 	mapLayers = []
-	for component in layer:
+	for component in layer['input']:
 		sourcePath = findFile(component['file'])
 		if sourcePath == None:
 			raise Exception("Couldn't find souce file '%s'" % component['file'])
@@ -107,8 +108,12 @@ for (layerName, layer) in layers.layers:
 					identifier = mapLayer + "-points"
 					mapFile += map.pointLayer(identifier, filename, sourceLayer, component['text'], component['fontSize'])
 					mapLayers.append(identifier)
-	tilecacheFile += tilecache.layer(layerName, mapLayers, mapDir)
-	htmlFile += html.layer(layerName, layerName)
+	tilecacheFile += tilecache.layer(layer['title'], mapLayers, mapDir)
+	htmlFile += html.layer(layer['title'], layer['title'], 'enabled' not in layer or layer['enabled'])
+	layerNames = [layer['title']]
+	if 'aliases' in layer:
+		layerNames += layer['aliases']
+	layersDefFile += ','.join(layerNames) + '\n'
 runCommands(commands)
 
 mapFile += map.footer()
@@ -129,8 +134,8 @@ for filename in config.mapExtraFiles:
 	shutil.copy(filename, ".")
 
 commands = []
-for (layerName, layer) in layers.layers:
-	commands.append("tilecache_seed.py '%s' %s" % (layerName, len(config.resolutions)))
+for layer in layers.layers:
+	commands.append("tilecache_seed.py '%s' %s" % (layer['title'], len(config.resolutions)))
 print "Generating tiles..."
 runCommands(commands)
 
@@ -138,6 +143,11 @@ shutil.rmtree(oldTilesDir, True)
 if os.path.exists(tilesDir):
 	shutil.move(tilesDir, oldTilesDir)
 shutil.move(tempTilesDir, tilesDir)
+
+print "Writing 'layers.def'..."
+layersDefStream = open(config.wwwDirectory + '/layers.def', 'w')
+layersDefStream.write(layersDefFile)
+layersDefStream.close()
 
 print "Writing 'index.html'..."
 htmlStream = open(config.wwwDirectory + '/index.html', 'w')
