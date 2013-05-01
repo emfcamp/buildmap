@@ -59,7 +59,7 @@ def header():
 
 	    nlr = new OpenLayers.Layer.WMS(
                 'nlr luchtfoto mapserver',
-                'http://gdsc.nlr.nl/wms/dkln2006',
+                'https://gis.ohm2013.org/wms/dkln2006',
                 {
                     layers: 'dkln2006-1m',
                     format: "image/png"
