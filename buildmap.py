@@ -44,9 +44,28 @@ def fileLayers(filename):
 def makeShapeFiles(sourceFile, layerName, outputTemplate):
 	if sourceFile.lower()[-4:] == ".dxf":
 		output = []
-		for (type, suffix) in [('POINT', 'points'), ('LINESTRING', 'lines'), ('POLYGON', 'areas')]:
-			filename = "%s-%s.shp" % (outputTemplate, suffix)
-			output.append("echo Generating shapefile '%s'...; ogr2ogr -skipfailures -where \"LAYER = '%s'\" '%s' '%s' -nlt %s 2>/dev/null" % (filename, layerName, filename, sourceFile, type))
+		
+		output.append("""
+echo Generating shapefile '%s-lines.shp'...;
+ogr2ogr -skipfailures -where \"LAYER = '%s'\" '%s-lines.shp' '%s' -nlt LINESTRING 2>/dev/null
+""" % (outputTemplate, layerName, outputTemplate, sourceFile))
+		
+		output.append("""
+echo Generating shapefile '%s-areas.shp'...;
+ogr2ogr -skipfailures -where \"LAYER = '%s'\" '%s-areas.shp' '%s' -nlt POLYGON 2>/dev/null
+""" % (outputTemplate, layerName, outputTemplate, sourceFile))
+		
+		output.append("""
+echo Generating shapefile '%s-points.shp'...;
+ogr2ogr -skipfailures -where \"LAYER = '%s'\" '%s-points.shp' '%s' -nlt POINT 2>/dev/null;
+ogr2ogr -f CSV -skipfailures -sql 'SELECT *, OGR_STYLE FROM entities WHERE LAYER = "%s"' '%s-points-data.csv' '%s' -nlt POINT 2>/dev/null;
+ogr2ogr -f CSV '%s-points-orig.csv' '%s-points.shp';
+fixlabels.py '%s-points-orig.csv' '%s-points-data.csv' '%s-points-fixed.csv';
+ogr2ogr '%s-points-fixed.shp' '%s-points-fixed.csv' 2>/dev/null;
+cp '%s-points-fixed.dbf' '%s-points.dbf'
+""" % (outputTemplate, layerName, outputTemplate, sourceFile, layerName, outputTemplate, sourceFile, outputTemplate, outputTemplate, outputTemplate, outputTemplate, outputTemplate, outputTemplate, outputTemplate, outputTemplate, outputTemplate))
+		
+		
 		return output
 	else:
 		raise Exception("Unsupported source file format: '%s'" % sourceFile)
@@ -78,6 +97,9 @@ htmlFile = html.header()
 layersDefFile = ''
 
 
+generated = []
+
+
 commands = []
 for layer in layers.layers:
 	mapLayers = []
@@ -93,7 +115,9 @@ for layer in layers.layers:
 					break
 			if match:
 				filename = "%s-%s" % (sanitize(component['file']), sanitize(sourceLayer))
-				commands += makeShapeFiles(sourcePath, sourceLayer, filename)
+				if sourceLayer not in generated:
+					commands += makeShapeFiles(sourcePath, sourceLayer, filename)
+					generated.append(sourceLayer)
 				mapLayer = sanitize(sourceLayer)
 				
 				if 'color' in component:
@@ -106,7 +130,7 @@ for layer in layers.layers:
 					mapLayers.append(identifier)
 				if 'text' in component:
 					identifier = mapLayer + "-points"
-					mapFile += map.pointLayer(identifier, filename, sourceLayer, component['text'], component['fontSize'])
+					mapFile += map.pointLayer(identifier, filename, sourceLayer, component['text'], component['fontSize'] if 'fontSize' in component else None)
 					mapLayers.append(identifier)
 	tilecacheFile += tilecache.layer(layer['title'], mapLayers, mapDir)
 	htmlFile += html.layer(layer['title'], layer['title'], 'enabled' not in layer or layer['enabled'])

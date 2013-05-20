@@ -149,15 +149,16 @@ def pointLayer(name, shapefile, description, color, size):
         FONT arial
         TYPE truetype
         SIZE %s
+        ANGLE [Angle]
         COLOR %s %s %s
-        POSITION lr
+        POSITION [Position]
         FORCE true
         ANTIALIAS true
         PARTIALS false
       END
     END
   END
-""" % (name, shapefile, alpha, description, size, red, green, blue)
+""" % (name, shapefile, alpha, description, size if size != None else "[Size]", red, green, blue)
 
 def footer():
 	return """
