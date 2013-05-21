@@ -7,7 +7,7 @@ def header():
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>OHM 2013 Geesterambacht</title>
+    <title>OHM 2013 Geestmerambacht</title>
     <link rel="stylesheet" href="../theme/default/style.css" type="text/css">
     <link rel="stylesheet" href="style.css" type="text/css">
     <script src="lib/OpenLayers.js"></script>
@@ -115,12 +115,12 @@ def layer(name, title, enabled):
 def footer():
 	return """
             ]);
-            map.zoomToExtent(new OpenLayers.Bounds( 111631.9,522846.501218,112975.9,523518.501218 )); // GeesterAmbacht
+            map.zoomToExtent(new OpenLayers.Bounds( 111631.9,522846.501218,112975.9,523518.501218 )); // GeestmerAmbacht
 
         } </script>
   </head>
   <body onload="init()">
-    <!--<h1 id="title">Geesterambacht</h1>-->
+    <!--<h1 id="title">Geestmerambacht</h1>-->
     <div id="map" sstyle="width:800px;height:400px;"></div>
 
   </body>
