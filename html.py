@@ -57,21 +57,6 @@ def header():
             //map.addControl( new OpenLayers.Control.Attribution() );
             //map.addControl( new OpenLayers.Control.ScaleLine() );
 
-	    nlr = new OpenLayers.Layer.WMS(
-                'nlr luchtfoto mapserver',
-                'https://gis.ohm2013.org/wms/dkln2006',
-                {
-                    layers: 'dkln2006-1m',
-                    format: "image/png"
-                },
-                {
-                    singleTile:false,
-                    isBaseLayer:true,
-                    attribution:'Kaartgegevens: TODO ',
-                    transitionEffect:'resize',
-                }
-            );
-
             var matrixIds = new Array(26);
             for (var i=0; i<26; ++i) {
             matrixIds[i] = 'EPSG:28992:' + i;
@@ -88,7 +73,7 @@ def header():
                 //transitionEffect:'resize',
             });
 
-            map.addLayers([nlr, brt
+            map.addLayers([brt
 """
 
 
