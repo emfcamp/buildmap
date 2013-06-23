@@ -10,6 +10,8 @@ def header():
     <title>OHM 2013 Geestmerambacht</title>
     <link rel="stylesheet" href="../theme/default/style.css" type="text/css">
     <link rel="stylesheet" href="style.css" type="text/css">
+    <script src="lib/proj4js-combined.js"></script>
+    <script src="lib/epsg28992.js"></script>
     <script src="lib/OpenLayers.js"></script>
     <style type="text/css">
      html {
@@ -53,6 +55,7 @@ def header():
             map.addControl( new OpenLayers.Control.LayerSwitcher()  );
             map.addControl( new OpenLayers.Control.PanZoomBar() );
             map.addControl( new OpenLayers.Control.MouseDefaults() );
+            map.addControl( new OpenLayers.Control.MousePosition({ displayProjection: new OpenLayers.Projection('EPSG:4326') }) );
             //map.addControl( new OpenLayers.Control.LoadingPanel() );
             //map.addControl( new OpenLayers.Control.Attribution() );
             //map.addControl( new OpenLayers.Control.ScaleLine() );
