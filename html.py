@@ -2,6 +2,7 @@ import config
 
 def header():
 	return """<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -10,6 +11,7 @@ def header():
     <title>OHM 2013 Geestmerambacht</title>
     <link rel="stylesheet" href="../theme/default/style.css" type="text/css">
     <link rel="stylesheet" href="style.css" type="text/css">
+    <script src="lib/jquery-1.10.1.min.js"></script>
     <script src="lib/proj4js-combined.js"></script>
     <script src="lib/epsg28992.js"></script>
     <script src="lib/OpenLayers.js"></script>
@@ -33,7 +35,9 @@ def header():
         var map, layer
         function init(){
             OpenLayers.DOTS_PER_INCH=90.7143
-            OpenLayers.ImgPath = "http://js.mapbox.com/theme/dark/";
+            OpenLayers.Util.onImageLoadErrorColor = 'transparent';
+            OpenLayers.Feature.prototype.popupClass = OpenLayers.Class(OpenLayers.Popup.FramedCloud, { 'autoSize': true, 'minSize': new OpenLayers.Size( 200, 100) });
+
             map = new OpenLayers.Map( 'map',
                   {
                     projection:"EPSG:28992",
@@ -46,19 +50,10 @@ def header():
                     controls: []
                   }
             );
-            map.events.register('moveend', map, 
-               function(){
-                      // $('scale').innerHTML='Schaal 1:'+parseInt(map.getScale());
-                      // $('zoom').innerHTML='Zoom '+map.getZoom();
-                      // $('resolution').innerHTML='Resolutie '+map.getResolution();
-            });
             map.addControl( new OpenLayers.Control.LayerSwitcher()  );
             map.addControl( new OpenLayers.Control.PanZoomBar() );
             map.addControl( new OpenLayers.Control.MouseDefaults() );
             map.addControl( new OpenLayers.Control.MousePosition({ displayProjection: new OpenLayers.Projection('EPSG:4326') }) );
-            //map.addControl( new OpenLayers.Control.LoadingPanel() );
-            //map.addControl( new OpenLayers.Control.Attribution() );
-            //map.addControl( new OpenLayers.Control.ScaleLine() );
 
             var matrixIds = new Array(26);
             for (var i=0; i<26; ++i) {
@@ -103,14 +98,50 @@ def layer(name, title, enabled):
 def footer():
 	return """
             ]);
-            map.zoomToExtent(new OpenLayers.Bounds( 111631.9,522846.501218,112975.9,523518.501218 )); // GeestmerAmbacht
+
+            wgs = new OpenLayers.Projection("EPSG:4326");
+            rds = new OpenLayers.Projection("EPSG:28992")
+            villagesLayer = new OpenLayers.Layer.Markers("Villages (Wiki)");
+            map.addLayer(villagesLayer);
+            jQuery.getJSON('cgi-bin/villages.json', function(data) {
+                villages = data["results"];
+                for (key in villages) {
+                    (function(){
+                        var name = villages[key]["fulltext"].substr(8);
+                        var url = villages[key]["fullurl"];
+                        lat = villages[key]["printouts"]["Village Location"][0]["lat"];
+                        lon = villages[key]["printouts"]["Village Location"][0]["lon"];
+                        var coordinate = new OpenLayers.LonLat(lon, lat);
+                        var description = villages[key]["printouts"]["Village Description"][0];
+                        coordinate.transform(wgs, rds);
+                        size = new OpenLayers.Size(21,25);
+                        offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
+                        marker = new OpenLayers.Marker(coordinate, new OpenLayers.Icon("lib/img/marker.png", size, offset));
+                        marker.events.register('mousedown', marker, function (event) {
+                            a = jQuery("<a/>");
+                            a.attr("href", url);
+                            a.text(name);
+                            b = jQuery("<b/>");
+                            a.appendTo(b);
+                            p = jQuery("<p>");
+                            p.text(description);
+                            div = jQuery("<div/>");
+                            b.appendTo(div);
+                            p.appendTo(div);
+                            popup = new OpenLayers.Popup.FramedCloud(event.id, coordinate, null, div.html(), null, true);
+                            map.addPopup(popup);
+                            OpenLayers.Event.stop(event);
+                        });
+                        villagesLayer.addMarker(marker);
+                    })();
+                }
+            });
+            map.zoomToExtent(new OpenLayers.Bounds(111573, 522775, 112628, 523527));
 
         } </script>
   </head>
   <body onload="init()">
-    <!--<h1 id="title">Geestmerambacht</h1>-->
     <div id="map" sstyle="width:800px;height:400px;"></div>
-
   </body>
 </html>
 """
