@@ -28,7 +28,7 @@ def parseTool(style):
 					value += style[i]
 					i += 1
 			style = style[i+1:]
-		elif style[0] in string.ascii_letters or style[0] in string.digits or style[0] in '#.':
+		elif style[0] in string.ascii_letters or style[0] in string.digits or style[0] in '#.-':
 			i = 1
 			while style[i] not in ',)':
 				i += 1
