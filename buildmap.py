@@ -69,7 +69,6 @@ cp '%s-points-fixed.dbf' '%s-points.dbf'
 		return output
 	else:
 		raise Exception("Unsupported source file format: '%s'" % sourceFile)
-	
 
 def runCommands(commands):
 	processes = {}
@@ -83,6 +82,12 @@ def runCommands(commands):
 			if pid in processes:
 				del processes[pid]
 
+def opaque(layer):
+	for input in layer["input"]:
+		if 'fill' in input:
+			return True
+	return False
+
 
 layerMap = {}
 for layer in layers.layers:
@@ -90,6 +95,9 @@ for layer in layers.layers:
 
 mergeLayerIndex = 0
 mergeLayers = []
+
+insertPoint = 0
+insertPointFixed = False
 
 for layerSet in layers.layerSets:
 	name = 'Merge-%d' % mergeLayerIndex
@@ -100,11 +108,15 @@ for layerSet in layers.layerSets:
 		if 'enabled' in layerMap[layer] and not layerMap[layer]['enabled']:
 			mergeLayer['enabled'] = False
 		layerMap[layer]['mergeLayer'] = name
+		if opaque(layerMap[layer]) and not insertPointFixed:
+			insertPoint += 1
+		else:
+			insertPointFixed = True
 	if mergeLayer['enabled']:
 		for layer in layerSet:
 			layerMap[layer]['enabled'] = False
 	mergeLayers.append(mergeLayer)
-layers.layers[:0] = mergeLayers
+layers.layers[insertPoint:insertPoint] = mergeLayers
 
 
 mapDir = tempfile.mkdtemp("-buildmap")
