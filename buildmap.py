@@ -83,6 +83,30 @@ def runCommands(commands):
 			if pid in processes:
 				del processes[pid]
 
+
+layerMap = {}
+for layer in layers.layers:
+	layerMap[layer["title"]] = layer
+
+mergeLayerIndex = 0
+mergeLayers = []
+
+for layerSet in layers.layerSets:
+	name = 'Merge-%d' % mergeLayerIndex
+	mergeLayer = { 'title': name, 'input': [], 'enabled': True, 'hidden': True }
+	mergeLayerIndex += 1
+	for layer in layerSet:
+		mergeLayer['input'].extend(layerMap[layer]['input'])
+		if 'enabled' in layerMap[layer] and not layerMap[layer]['enabled']:
+			mergeLayer['enabled'] = False
+		layerMap[layer]['mergeLayer'] = name
+	if mergeLayer['enabled']:
+		for layer in layerSet:
+			layerMap[layer]['enabled'] = False
+	mergeLayers.append(mergeLayer)
+layers.layers[:0] = mergeLayers
+
+
 mapDir = tempfile.mkdtemp("-buildmap")
 os.chdir(mapDir)
 
@@ -133,7 +157,7 @@ for layer in layers.layers:
 					mapFile += map.pointLayer(identifier, filename, sourceLayer, component['text'], component['fontSize'] if 'fontSize' in component else None)
 					mapLayers.append(identifier)
 	tilecacheFile += tilecache.layer(layer['title'], mapLayers, mapDir)
-	htmlFile += html.layer(layer['title'], layer['title'], 'enabled' not in layer or layer['enabled'])
+	htmlFile += html.layer(layer['title'], layer['title'], 'enabled' not in layer or layer['enabled'], 'hidden' in layer and layer['hidden'], layer['mergeLayer'] if 'mergeLayer' in layer else None)
 	layerNames = [layer['title']]
 	if 'aliases' in layer:
 		layerNames += layer['aliases']

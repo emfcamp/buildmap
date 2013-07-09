@@ -15,6 +15,7 @@ def header():
     <script src="lib/proj4js-combined.js"></script>
     <script src="lib/epsg28992.js"></script>
     <script src="lib/OpenLayers.js"></script>
+    <script src="lib/ModifiedLayerSwitcher.js"></script>
     <style type="text/css">
      html {
         width: 100%;
@@ -68,14 +69,13 @@ def header():
                 matrixSet: 'EPSG:28992',
                 matrixIds: matrixIds,
                 isBaseLayer: true,
-                //transitionEffect:'resize',
             });
 
             map.addLayers([brt
 """
 
 
-def layer(name, title, enabled):
+def layer(name, title, enabled, hidden, mergeLayer):
 	return """
             , new OpenLayers.Layer.TileCache(
                 '%s',
@@ -89,10 +89,11 @@ def layer(name, title, enabled):
                     tileSize: new OpenLayers.Size(1024, 1024),
                     isBaseLayer: false,
                     visibility: %s,
-                    //transitionEffect: 'map-resize',
+                    displayInLayerSwitcher: %s,
+                    %s
                 }
             )
-""" % (title, config.url, name, ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.extents)), 'true' if enabled else 'false')
+""" % (title, config.url, name, ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.extents)), 'true' if enabled else 'false', 'false' if hidden else 'true', ('mergeLayer: "%s"' % mergeLayer) if mergeLayer != None else '')
 
 
 def footer():
