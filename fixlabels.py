@@ -72,6 +72,14 @@ def getStyle(style):
 	else:
 		return {}
 
+def sanitizeText(text):
+	while len(text) > 0 and text[0] == '\\':
+		pos = text.find(';')
+		if pos == -1:
+			break
+		text = text[pos + 1:]
+	return text
+
 datafile = open(sys.argv[2], 'r')
 dataReader = csv.reader(datafile)
 dataHeader = dataReader.next()
@@ -115,7 +123,7 @@ if os.path.exists(sys.argv[1]):
 	for row in entityReader:
 		layer = row[entityIndex['Layer']]
 		id = row[entityIndex['EntityHand']]
-		text = row[entityIndex['Text']]
+		text = sanitizeText(row[entityIndex['Text']])
 		if id in data:
 			outputWriter.writerow([layer, id, text, data[id]['size'], data[id]['angle'], data[id]['position']])
 		else:
