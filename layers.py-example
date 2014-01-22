@@ -6,8 +6,14 @@ mapfile = '1141-6006-1-gmc-cropped.dxf'
 # the map server, as well as the rendering order; layers containing transparent areas,
 # like Fields, should be at the beginning to avoid overlaying an area on top of other data.
 #
-# Each map-visible layer is a tuple of a name (visible in the layer selection settings)
-# together with an unordered set of input sources.
+# Each map-visible layer is a dictionary containing the following fields:
+# - title:     The name of the layer as visible in the layer picker box.
+# - aliases:   Alternative names for this layer that are also accepted by the
+#              Semantic Maps wiki extension. To ensure compatibility with existing
+#              wiki maps, if a layer title is changed, the old name should be added
+#              as an alias.
+# - input:     A list of input layers, described below, in increasing z-order.
+# - enabled:   If set to False, the layer is disabled by default. Defaults to True.
 #
 # An input source consists of an input file (currently only .dxf files are supported,
 # but this can be changed if we're going to add data from NOC and Power) along with a
@@ -23,74 +29,312 @@ mapfile = '1141-6006-1-gmc-cropped.dxf'
 # - fill:           The color used to render AREA data in this data source.
 # - text, fontSize: The color and font size used to render text labels in the data source.
 #                   Font sizes are in a scale roughly compatible with those specified in QCad.
+#                   If the font size is not specified, the size from the map file is used.
 #
 
 layers = [
-	('Fields', [
+	{
+		'title': 'Fields',
+		'input': [
 		{
 			'file': mapfile,
-			'layers': ['FIELD.*'],
+			'layers': ['Fields - Hatches'],
+			'fill': '6dc561',
+		},
+		{
+			'file': mapfile,
+			'layers': ['FIELD [^P].*hull'],
 			'color': '008000',
 			'width': '3',
-			'fill': '00ff0080',
 			'text': '000000',
-			'fontSize': 10,
-		}
-	]),
-	('Tents', [
+		},
+	]},
+	{
+		'title': 'Ditches',
+		'input': [
 		{
 			'file': mapfile,
-			'layers': ['T .*', 'T[0-9]'],
+			'layers': ['Terrein - Water'],
+			'color': '0000ff',
+			'width': '2',
+			'fill': '0c6ccc',
+		},
+	]},
+	{
+		'title': 'Hills',
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['Terrein - Heuvels', 'Terrein - .*talud.*'],
+			'color': '006000',
+			'width': '2',
+			'fill': '008000a0',
+		},
+	]},
+	{
+		'title': 'Roads',
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['Wegen - Gemotoriseerd'],
+			'color': '202020',
+			'width': '3',
+			'fill': 'e0e0e0',
+		},
+		{
+			'file': mapfile,
+			'layers': ['Wegen - Bouwweg zandopslag', 'Wegen - Fietspad'],
+			'color': '202020',
+			'width': '2',
+			'fill': 'e0dace',
+		},
+		{
+			'file': mapfile,
+			'layers': ['Wegen - Fietsbrug'],
+			'color': '404040',
+			'width': '3',
+		},
+		{
+			'file': mapfile,
+			'layers': ['Wegen - Bouwweg velden'],
+			'color': 'ff0000',
+			'width': '2',
+			'fill': 'e0dace',
+		},
+		{
+			'file': mapfile,
+			'layers': ['Wegen - Event roads', 'Wegen - Temp bridges'],
+			'color': 'ff0000',
+			'width': '1',
+		},
+		{
+			'file': mapfile,
+			'layers': ['Street names'],
+			'text': 'ffffff',
+		},
+	]},
+	{
+		'title': 'Archeology',
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['Opgravingen'],
+			'color': 'ff0000',
+			'width': '1',
+		}
+	]},
+	{
+		'title': 'Tents',
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['Tenten - [^v].*'],
 			'color': 'ffff00',
 			'width': '2',
-			'fill': 'ffff00c0',
-		}
-	]),
-	('Roads', [
+			'text': '000000',
+		},
 		{
 			'file': mapfile,
-			'layers': ['V[0-9][0-9] .*'],
-			'color': '808080',
+			'layers': ['Labels - Tentnamen'],
+			'text': '000000',
+		},
+	]},
+	{
+		'title': 'Village Tents',
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['Tenten - villages'],
+			'color': 'ffff00',
+			'width': '2',
+			'text': '000000',
+		},
+		{
+			'file': mapfile,
+			'layers': ['Labels - Tent villagenamen'],
+			'text': '000000',
+		},
+	]},
+	{
+		'title': 'Furniture',
+		'enabled': False,
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['Interieur.*'],
+			'color': 'ff00ff',
+			'width': '1',
+		},
+	]},
+	{
+		'title': 'Toilets and Showers',
+		'aliases': ['Toilets', 'Showers'],
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['Sanitair - Douches', 'Sanitair - Toiletten'],
+			'color': '000000',
+			'width': '1',
+		},
+	]},
+	{
+		'title': 'Scaffolding',
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['Steigerwerk.*'],
+			'color': 'ffaa00',
+			'width': '2',
+		},
+	]},
+	{
+		'title': 'Power',
+		'enabled': False,
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['\\[Power\\].*'],
+			'color': 'ff8000',
+			'width': '1',
+		},
+	]},
+	{
+		'title': 'Plumbing',
+		'enabled': False,
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['Sanitair - Water'],
+			'color': '0000ff',
+			'width': '3',
+		},
+		{
+			'file': mapfile,
+			'layers': ['Sanitair - Riool'],
+			'color': 'aa5500',
+			'width': '3',
+		},
+	]},
+	{
+		'title': 'NOC',
+		'enabled': False,
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['\\[NOC\\] Cables copper max 80m'],
+			'color': '000000',
 			'width': '2',
 		},
 		{
 			'file': mapfile,
-			'layers': ['bouwweg', 'event roads'],
-			'color': 'ff0000',
-			'width': '1',
-		}
-	]),
-	('Ditches', [
-		{
-			'file': mapfile,
-			'layers': ['W[0-9][0-9] .*'],
-			'color': '0000ff',
+			'layers': ['\\[NOC\\] Cables singlemode fibers'],
+			'color': '00ff00',
 			'width': '2',
-		}
-	]),
-	('Power', [
+		},
 		{
 			'file': mapfile,
-			'layers': ['aggregaten'],
-			'color': 'ff8000',
+			'layers': ['\\[NOC\\] Cables multimode fiber'],
+			'color': '00ffff',
+			'width': '2',
+		},
+		{
+			'file': mapfile,
+			'layers': ['\\[NOC\\] Uplink'],
+			'color': 'ff0000',
+			'width': '2',
+		},
+		{
+			'file': mapfile,
+			'layers': ['\\[NOC\\] Distribution switches'],
+			'color': 'ff00ff',
+			'width': '2',
+		},
+		{
+			'file': mapfile,
+			'layers': ['\\[NOC\\] Switches in tents'],
+			'color': '00ffff',
+			'width': '2',
+		},
+		{
+			'file': mapfile,
+			'layers': ['\\[NOC\\] Datenklos', '\\[NOC\\] Comments'],
+			'color': '000000',
+			'width': '2',
+			'text': '000000',
+		},
+	]},
+	{
+		'title': 'LOC - Lights',
+		'enabled': False,
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['\\[LOC\\] terreinverlichting'],
+			'color': '00FFFF',
+			'width': '2',
+			'text': '000000',
+		},
+	]},
+	{
+		'title': 'LOC - Cabling',
+		'enabled': False,
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['\\[LOC\\] ethernet'],
+			'color': '40FFFF',
+			'width': '2',
+			'text': '000000',
+		},
+	]},
+	{
+		'title': 'Fences',
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['Hekwerk.*'],
+			'color': 'ff0000',
+			'width': '3',
+		},
+	]},
+	{
+		'title': 'Parking',
+		'input': [
+		{
+			'file': mapfile,
+			'layers': ['FIELD P - hull'],
+			'color': '0000ff',
 			'width': '1',
-			'fill': 'ff8000',
-		}
-	]),
-	('Toilets', [
+			'fill': '0000ff',
+		},
 		{
 			'file': mapfile,
-			'layers': ['toilet'],
+			'layers': ['Parking'],
 			'color': '000000',
 			'width': '1',
-		}
-	]),
-	('Border', [
+		},
+		{
+			'file': mapfile,
+			'layers': ['FIELD P - hull'],
+			'color': '0000ff',
+			'width': '1',
+			'text': 'ffffff',
+			'fontSize': 40,
+		},
+	]},
+	{
+		'title': 'Border',
+		'input': [
 		{
 			'file': mapfile,
 			'layers': ['border'],
 			'color': '000000',
 			'width': '3',
-		}
-	]),
+		},
+	]},
+]
+
+layerSets = [
+	["Fields", "Ditches", "Hills", "Roads", "Archeology", "Fences", "Parking", "Border"],
+	["Tents", "Village Tents", "Toilets and Showers", "Scaffolding"],
 ]
