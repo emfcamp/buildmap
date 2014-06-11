@@ -2,8 +2,8 @@ import datetime
 import os
 import re
 import shutil
-import subprocess
 import tempfile
+import logging
 
 import map
 import tilecache
@@ -12,208 +12,108 @@ import html
 import config
 import layers
 
-def sanitize(filename):
-	output = ''
-	for c in filename:
-		if c.isalnum():
-			output += c
-		else:
-			output += '_'
-	return output
+from util import sanitize, findFile, fileLayers, makeShapeFiles, runCommands, parse_layer_config
 
-def findFile(filename):
-	for directory in config.directories:
-		fullPath = directory + '/' + filename
-		if os.path.isfile(fullPath):
-			return fullPath
-	return None
+from collections import defaultdict
 
-fileLayerCache = {}
-def fileLayers(filename):
-	if filename not in fileLayerCache:
-		proc = os.popen("ogrinfo '%s' -al | grep -E '  Layer \\(String\\) = .*' | sed -e 's/  Layer (String) = //' | sort | uniq" % filename, "r")
-		layers = []
-		for line in proc:
-			layer = line.strip("\n")
-			if len(layer) > 0:
-				layers.append(layer)
-		proc.close()
-		fileLayerCache[filename] = layers
-	return fileLayerCache[filename]
+class BuildMap(object):
 
-def makeShapeFiles(sourceFile, layerName, outputTemplate):
-	if sourceFile.lower()[-4:] == ".dxf":
-		output = []
-		
-		output.append("""
-echo Generating shapefile '%s-lines.shp'...;
-ogr2ogr -skipfailures -where \"LAYER = '%s'\" '%s-lines.shp' '%s' -nlt LINESTRING 2>/dev/null
-""" % (outputTemplate, layerName, outputTemplate, sourceFile))
-		
-		output.append("""
-echo Generating shapefile '%s-areas.shp'...;
-ogr2ogr -skipfailures -where \"LAYER = '%s'\" '%s-areas.shp' '%s' -nlt POLYGON 2>/dev/null
-""" % (outputTemplate, layerName, outputTemplate, sourceFile))
-		
-		output.append("""
-echo Generating shapefile '%s-points.shp'...;
-ogr2ogr -skipfailures -where \"LAYER = '%s'\" '%s-points.shp' '%s' -nlt POINT 2>/dev/null;
-ogr2ogr -f CSV -skipfailures -sql 'SELECT *, OGR_STYLE FROM entities WHERE LAYER = "%s"' '%s-points-data.csv' '%s' -nlt POINT 2>/dev/null;
-ogr2ogr -f CSV '%s-points-orig.csv' '%s-points.shp';
-fixlabels.py '%s-points-orig.csv' '%s-points-data.csv' '%s-points-fixed.csv';
-ogr2ogr '%s-points-fixed.shp' '%s-points-fixed.csv' 2>/dev/null;
-cp '%s-points-fixed.dbf' '%s-points.dbf'
-""" % (outputTemplate, layerName, outputTemplate, sourceFile, layerName, outputTemplate, sourceFile, outputTemplate, outputTemplate, outputTemplate, outputTemplate, outputTemplate, outputTemplate, outputTemplate, outputTemplate, outputTemplate))
-		
-		
-		return output
-	else:
-		raise Exception("Unsupported source file format: '%s'" % sourceFile)
+    def __init__(self, config):
+        self.log = logging.getLogger(__name__)
+        self.config = config
+        self.generated_layers = set()  # Layers for which we've already generated shapefiles
 
-def runCommands(commands):
-	processes = {}
-	while len(commands) > 0 or len(processes) > 0:
-		if len(commands) > 0 and len(processes) < config.threads:
-			process = subprocess.Popen(commands[0], shell = True)
-			del commands[0]
-			processes[process.pid] = process
-		if len(commands) == 0 or len(processes) >= config.threads:
-			(pid, status) = os.wait()
-			if pid in processes:
-				del processes[pid]
+    def find_layer(self, layer_regex, source_path):
+        for source_layer in fileLayers(source_path):
+            if re.match(layer_regex + "$", source_layer):
+                return source_layer
+        return None
 
-def opaque(layer):
-	for input in layer["input"]:
-		if 'fill' in input:
-			return True
-	return False
+    def import_layers(self, layers):
+        """ Given a layer config, import the layers, copying the layer data from DXF to shapefile"""
+        self.map_layers = defaultdict(list)
+        for layer in layers:
+            for component in layer['input']:
+                component_layers = list(self.import_layer_component(component))
+                self.map_layers[layer['title']] += component_layers
 
+    def import_layer_component(self, component):
+        for layer_regex in component['layers']:
+            source_path = findFile(component['file'])
+            if source_path is None:
+                raise Exception("Couldn't find source file '%s'" % component['file'])
 
-layerMap = {}
-for layer in layers.layers:
-	layerMap[layer["title"]] = layer
+            source_layer = self.find_layer(layer_regex, source_path)
+            if source_layer is None:
+                logging.warn("Couldn't find configured layer %s in DXF files", layer_regex)
+                continue
+            filename = "%s-%s" % (sanitize(component['file']), sanitize(source_layer))
+            self.generate_layer_shapefile(source_path, source_layer, filename)
+            yield parse_layer_config(filename, source_layer, component)
 
-mergeLayerIndex = 0
-mergeLayers = []
+    def layer_names(self, layers):
+        """ Yield all possible layer names and aliases """
+        for layer in layers:
+            yield layer['title']
+            if 'aliases' in layer:
+                for alias in layer['aliases']:
+                    yield alias
 
-insertPoint = 0
-insertPointFixed = False
+    def generate_layer_shapefile(self, source_path, source_layer, filename):
+        if source_layer not in self.generated_layers:
+            runCommands(makeShapeFiles(source_path, source_layer, filename))
+            self.generated_layers.add(source_layer)
 
-for layerSet in layers.layerSets:
-	name = 'Merge-%d' % mergeLayerIndex
-	mergeLayer = { 'title': name, 'input': [], 'enabled': True, 'hidden': True }
-	mergeLayerIndex += 1
-	for layer in layerSet:
-		mergeLayer['input'].extend(layerMap[layer]['input'])
-		if 'enabled' in layerMap[layer] and not layerMap[layer]['enabled']:
-			mergeLayer['enabled'] = False
-		layerMap[layer]['mergeLayer'] = name
-		if opaque(layerMap[layer]) and not insertPointFixed:
-			insertPoint += 1
-		else:
-			insertPointFixed = True
-	if mergeLayer['enabled']:
-		for layer in layerSet:
-			layerMap[layer]['enabled'] = False
-	mergeLayers.append(mergeLayer)
-layers.layers[insertPoint:insertPoint] = mergeLayers
+    def write_file(self, name, data):
+        with open(name, 'w') as fp:
+            fp.write(data)
 
+    def build_map(self, mapDir, layers):
+        self.log.info("Generating map...")
+        os.chdir(mapDir)
+        tilesDir = self.config.output_directory + "/tiles"
+        tempTilesDir = tilesDir + "-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        oldTilesDir = tilesDir + "-old"
 
-mapDir = tempfile.mkdtemp("-buildmap")
-os.chdir(mapDir)
+        self.import_layers(layers)
 
-tilesDir = config.wwwDirectory + "/tiles"
-tempTilesDir = tilesDir + "-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-oldTilesDir = tilesDir + "-old"
+        self.log.info("Generating mapfile...")
+        self.write_file('buildmap.map', map.render_mapfile(self.map_layers, self.config))
 
+        self.log.info("Generating 'tilecache.cfg'...")
+        self.write_file('tilecache.cfg', tilecache.render_tilecache_file(self.map_layers, config))
 
-mapFile = map.header()
-tilecacheFile = tilecache.header(tempTilesDir)
-htmlFile = html.header()
-layersDefFile = ''
+        for filename in config.mapExtraFiles:
+            shutil.copy(filename, ".")
 
+        return
+        commands = []
+        for layer in layers.layers:
+            commands.append("tilecache_seed.py '%s' %s" % (layer['title'], len(config.resolutions)))
+        print "Generating tiles..."
+        runCommands(commands)
 
-generated = []
+        shutil.rmtree(oldTilesDir, True)
+        if os.path.exists(tilesDir):
+            shutil.move(tilesDir, oldTilesDir)
+        shutil.move(tempTilesDir, tilesDir)
 
+        print "Writing 'layers.def'..."
+        layersDefStream = open(config.output_directory + '/layers.def', 'w')
+        layersDefStream.write(layersDefFile)
+        layersDefStream.close()
 
-commands = []
-for layer in layers.layers:
-	mapLayers = []
-	for component in layer['input']:
-		sourcePath = findFile(component['file'])
-		if sourcePath == None:
-			raise Exception("Couldn't find souce file '%s'" % component['file'])
-		for sourceLayer in fileLayers(sourcePath):
-			match = False
-			for regex in component['layers']:
-				if re.match(regex + "$", sourceLayer):
-					match = True
-					break
-			if match:
-				filename = "%s-%s" % (sanitize(component['file']), sanitize(sourceLayer))
-				if sourceLayer not in generated:
-					commands += makeShapeFiles(sourcePath, sourceLayer, filename)
-					generated.append(sourceLayer)
-				mapLayer = sanitize(sourceLayer)
-				
-				if 'color' in component:
-					identifier = mapLayer + "-lines"
-					mapFile += map.lineLayer(identifier, filename, sourceLayer, component['color'], component['width'])
-					mapLayers.append(identifier)
-				if 'fill' in component:
-					identifier = mapLayer + "-areas"
-					mapFile += map.areaLayer(identifier, filename, sourceLayer, component['fill'])
-					mapLayers.append(identifier)
-				if 'text' in component:
-					identifier = mapLayer + "-points"
-					mapFile += map.pointLayer(identifier, filename, sourceLayer, component['text'], component['fontSize'] if 'fontSize' in component else None)
-					mapLayers.append(identifier)
-	tilecacheFile += tilecache.layer(layer['title'], mapLayers, mapDir)
-	htmlFile += html.layer(layer['title'], layer['title'], 'enabled' not in layer or layer['enabled'], 'hidden' in layer and layer['hidden'], layer['mergeLayer'] if 'mergeLayer' in layer else None)
-	layerNames = [layer['title']]
-	if 'aliases' in layer:
-		layerNames += layer['aliases']
-	layersDefFile += ','.join(layerNames) + '\n'
-runCommands(commands)
+        #print "Writing 'index.html'..."
+        #htmlStream = open(config.output_directory + '/index.html', 'w')
+        #htmlStream.write(htmlFile)
+        #htmlStream.close()
 
-mapFile += map.footer()
-tilecacheFile += tilecache.footer()
-htmlFile += html.footer()
+        os.chdir("/")
+        shutil.rmtree(mapDir, True)
+        shutil.rmtree(oldTilesDir, True)
 
-print "Generating mapfile 'ohm.map'..."
-mapStream = open('ohm.map', 'w')
-mapStream.write(mapFile)
-mapStream.close()
-
-print "Generating 'tilecache.cfg'..."
-tilecacheStream = open('tilecache.cfg', 'w')
-tilecacheStream.write(tilecacheFile)
-tilecacheStream.close()
-
-for filename in config.mapExtraFiles:
-	shutil.copy(filename, ".")
-
-commands = []
-for layer in layers.layers:
-	commands.append("tilecache_seed.py '%s' %s" % (layer['title'], len(config.resolutions)))
-print "Generating tiles..."
-runCommands(commands)
-
-shutil.rmtree(oldTilesDir, True)
-if os.path.exists(tilesDir):
-	shutil.move(tilesDir, oldTilesDir)
-shutil.move(tempTilesDir, tilesDir)
-
-print "Writing 'layers.def'..."
-layersDefStream = open(config.wwwDirectory + '/layers.def', 'w')
-layersDefStream.write(layersDefFile)
-layersDefStream.close()
-
-print "Writing 'index.html'..."
-htmlStream = open(config.wwwDirectory + '/index.html', 'w')
-htmlStream.write(htmlFile)
-htmlStream.close()
-
-os.chdir("/")
-shutil.rmtree(mapDir, True)
-shutil.rmtree(oldTilesDir, True)
+if __name__ == '__main__':
+    #mapDir = tempfile.mkdtemp("-buildmap")
+    #build_map(mapDir)
+    bm = BuildMap(config)
+    bm.build_map('/Users/russ/emf/buildmap/test', layers.layers)

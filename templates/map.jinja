@@ -1,0 +1,101 @@
+MAP
+  NAME "QGIS-MAP"
+  # Map image size
+  SIZE 100 100
+  UNITS meters
+
+  FONTSET './fonts.txt'
+  SYMBOLSET './symbols.txt'
+  PROJECTION
+    "init=epsg:{{config.projection}}"
+  END
+
+  # Background color for the map canvas -- change as desired
+  IMAGECOLOR 255 255 255
+  IMAGEQUALITY 95
+  IMAGETYPE agg
+  TRANSPARENT on
+
+  OUTPUTFORMAT
+    NAME agg
+    DRIVER AGG/PNG
+    IMAGEMODE RGBA
+  END
+
+  # Legend
+  LEGEND
+    IMAGECOLOR 255 255 255
+    STATUS ON
+    KEYSIZE 18 12
+    LABEL
+      TYPE BITMAP
+      SIZE MEDIUM
+      COLOR 0 0 89
+    END
+  END
+
+  # Web interface definition. Only the template parameter
+  # is required to display a map. See MapServer documentation
+  WEB
+    # Set IMAGEPATH to the path where MapServer should
+    # write its output.
+    IMAGEPATH '/tmp/'
+
+    # Set IMAGEURL to the url that points to IMAGEPATH
+    # as defined in your web server configuration
+    IMAGEURL '/tmp/'
+
+    # WMS server settings
+    METADATA
+      'ows_title'           'QGIS-MAP'
+      'ows_onlineresource'  'http://localhost/cgi-bin/mapserv?map=ohm.map'
+      'ows_srs'             'EPSG:28992'
+      'ows_enable_request'  '*'
+    END
+
+    #Scale range at which web interface will operate
+    # Template and header/footer settings
+    # Only the template parameter is required to display a map. See MapServer documentation
+    #TEMPLATE 'fooOnlyForWMSGetFeatureInfo'
+  END
+
+{% for layer in layers %}
+  LAYER
+    NAME '{{layer.name}}'
+    TYPE {{layer.type|upper}}
+    DATA '{{layer.source}}'
+    STATUS ON
+    TRANSPARENCY {{layer.alpha}}
+    PROJECTION
+        "init=epsg:{{config.projection}}"
+    END
+    {% if layer.type == 'point' %}
+    LABELITEM 'Text'
+    SYMBOLSCALEDENOM 2500
+    {% endif %}
+    CLASS
+       NAME '{{layer.description}}'
+       {% if layer.type == 'point' %}
+       LABEL
+          FONT arial
+          TYPE truetype
+          SIZE [Size]
+          ANGLE [Angle]
+          COLOR {{layer.red}} {{layer.green}} {{layer.blue}}
+          POSITION [Position]
+          FORCE true
+          ANTIALIAS true
+          PARTIALS false
+       END
+       {% else %}
+       STYLE
+         {% if layer.type == 'line' %}
+         WIDTH {{layer.width}}
+         {% endif %}
+         COLOR {{layer.red}} {{layer.green}} {{layer.blue}}
+       END
+       {% endif %}
+    END
+  END
+{% endfor %}
+END

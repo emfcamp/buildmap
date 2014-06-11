@@ -1,28 +1,12 @@
-import config
-
-def header(cacheDirectory):
-	return """
-[cache]
-type=Disk
-base=%s
-
-""" % cacheDirectory
-
-def layer(name, mapFileLayers, mapDirectory):
-	return """
-[%s]
-type=MapServerLayer
-layers=%s
-mapfile=ohm.map
-debug=on
-extension=png
-resolutions=%s
-srs=EPSG:28992
-bbox=%s
-size=1024,1024
+from jinja2 import Environment, PackageLoader
 
 
-""" % (name, ",".join(mapFileLayers), ", ".join(map(str, config.resolutions)), ", ".join(map(str, config.extents)))
+def render_tilecache_file(layers, config):
+    data = {}
+    for name, layers in layers.iteritems():
+        data[name] = {'layer_list': ",".join(layer['name'] for layer in layers),
+                      'source_file': layers[0]['source']}
 
-def footer():
-	return ""
+    env = Environment(loader=PackageLoader('buildmap', 'templates'))
+    template = env.get_template('tilecache.jinja')
+    return template.render(layers=data, config=config)

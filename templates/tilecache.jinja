@@ -1,0 +1,16 @@
+[cache]
+type=Disk
+base={{cache_directory}}
+
+{% for name, layer in layers.iteritems() %}
+[{{name}}]
+type=MapServerLayer
+layers={{layer.layer_list}}
+mapfile={{layer.source_file}}
+debug=on
+extension=png
+resolutions=%s
+srs=EPSG:{{config.projection}}
+bbox={{config.extents}}
+size=1024,1024
+{% endfor %}
