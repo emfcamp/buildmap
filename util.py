@@ -85,24 +85,34 @@ def opaque(layer):
 
 def parse_layer_config(filename, source_layer, layer_config):
     mapLayer = sanitize(source_layer)
-    layer = {
-        'source': filename,
-        'description': source_layer,
-    }
     if 'color' in layer_config:
+        layer = {
+            'source': filename,
+            'description': source_layer,
+        }
+
         layer['type'] = 'line'
         layer['name'] = mapLayer + "-lines"
         layer['color'] = layer_config['color']
         layer['width'] = layer_config['width']
-    elif 'fill' in layer_config:
+        yield layer
+    if 'fill' in layer_config:
+        layer = {
+            'source': filename,
+            'description': source_layer,
+        }
+
         layer['type'] = 'area'
         layer['name'] = mapLayer + "-areas"
         layer['color'] = layer_config['fill']
-    elif 'text' in layer_config:
+        yield layer
+    if 'text' in layer_config:
+        layer = {
+            'source': filename,
+            'description': source_layer,
+        }
         layer['type'] = 'point'
         layer['name'] = mapLayer + "-points"
         layer['color'] = layer_config['text']
         layer['size'] = layer_config['fontSize'] if 'fontSize' in layer_config else None
-    else:
-        raise Exception("Unrecognised layer config for layer %s" % layer_config)
-    return layer
+        yield layer

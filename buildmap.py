@@ -60,7 +60,8 @@ class BuildMap(object):
                 continue
             filename = "%s-%s" % (sanitize(component['file']), sanitize(source_layer))
             self.generate_layer_shapefile(source_path, source_layer, filename)
-            yield parse_layer_config(filename, source_layer, component)
+            for config in parse_layer_config(filename, source_layer, component):
+                yield config
 
     def layer_names(self, layers):
         """ Yield all possible layer names and aliases """
