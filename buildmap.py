@@ -99,7 +99,8 @@ class BuildMap(object):
         commands = []
         tilecache_config = os.path.join(self.temp_dir, 'tilecache.cfg')
         for layer in layers:
-            commands.append("tilecache_seed.py -c %s '%s' %s" % (tilecache_config, layer['title'], len(config.resolutions)))
+            commands.append("%s -c %s '%s' %s" % (config.tilecache_seed_binary, tilecache_config,
+                                                  layer['title'], len(config.resolutions)))
         self.log.info("Generating tiles...")
         runCommands(commands)
 
