@@ -85,7 +85,7 @@ MAP
          LABEL
             FONT arial
             TYPE truetype
-            SIZE {{layer.size}}
+            SIZE {% if layer.size %}{{layer.size}}{% else %}[Size]{% endif %}
             ANGLE [Angle]
             COLOR {{layer.red}} {{layer.green}} {{layer.blue}}
             POSITION [Position]
