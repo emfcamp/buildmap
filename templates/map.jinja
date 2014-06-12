@@ -82,7 +82,6 @@ MAP
     CLASS
        NAME '{{layer.description}}'
        {% if layer.type == 'point' %}
-       STYLE
          LABEL
             FONT arial
             TYPE truetype
@@ -94,7 +93,9 @@ MAP
             ANTIALIAS true
             PARTIALS false
          END
-       END
+         STYLE
+            COLOR {{layer.red}} {{layer.green}} {{layer.blue}}
+         END
        {% else %}
        STYLE
          {% if layer.type == 'line' %}
