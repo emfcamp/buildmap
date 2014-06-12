@@ -82,16 +82,18 @@ MAP
     CLASS
        NAME '{{layer.description}}'
        {% if layer.type == 'point' %}
-       LABEL
-          FONT arial
-          TYPE truetype
-          SIZE [Size]
-          ANGLE [Angle]
-          COLOR {{layer.red}} {{layer.green}} {{layer.blue}}
-          POSITION [Position]
-          FORCE true
-          ANTIALIAS true
-          PARTIALS false
+       STYLE
+         LABEL
+            FONT arial
+            TYPE truetype
+            SIZE [Size]
+            ANGLE [Angle]
+            COLOR {{layer.red}} {{layer.green}} {{layer.blue}}
+            POSITION [Position]
+            FORCE true
+            ANTIALIAS true
+            PARTIALS false
+         END
        END
        {% else %}
        STYLE
