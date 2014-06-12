@@ -1,0 +1,20 @@
+map.addLayers([
+{% for name, layer in layers.iteritems() %}
+{% if loop.index > 1 %},{% endif %}
+new OpenLayers.Layer.TileCache(
+                '{{name}}',
+                '{{config.url}}/tiles',
+                '{{name}}',
+                {
+                    singleTile:false,
+                    resolutions: [{{config.resolutions|join(',')}}],
+                    serverResolutions: [{{config.resolutions|join(',')}}],
+                    maxExtent: new OpenLayers.Bounds({{config.extents|join(',')}}),
+                    tileSize: new OpenLayers.Size(1024, 1024),
+                    isBaseLayer: false,
+                    visibility: true,
+                    displayInLayerSwitcher: true
+                }
+            )
+{% endfor %}
+])

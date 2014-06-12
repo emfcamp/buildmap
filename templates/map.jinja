@@ -63,7 +63,13 @@ MAP
   LAYER
     NAME '{{layer.name}}'
     TYPE {{layer.type|upper}}
-    DATA '{{layer.source}}'
+    {% if layer.type == 'point' %}
+    DATA '{{layer.source}}-points'
+    {% elif layer.type == 'area' %}
+    DATA '{{layer.source}}-areas'
+    {% elif layer.type == 'line' %}
+    DATA '{{layer.source}}-lines'
+    {% endif %}
     STATUS ON
     TRANSPARENCY {{layer.alpha}}
     PROJECTION

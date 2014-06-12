@@ -6,11 +6,11 @@ base={{cache_directory}}
 [{{name}}]
 type=MapServerLayer
 layers={{layer.layer_list}}
-mapfile={{layer.source_file}}
-debug=on
+mapfile=./temp/buildmap.map
+debug=off
 extension=png
-resolutions=%s
+resolutions={{config.resolutions|join(",")}}
 srs=EPSG:{{config.projection}}
-bbox={{config.extents}}
+bbox={{config.extents|join(",")}}
 size=1024,1024
 {% endfor %}

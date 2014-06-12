@@ -51,3 +51,5 @@ docs/_build/
 
 config.py
 layers.py
+temp/
+output/

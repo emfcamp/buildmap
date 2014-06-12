@@ -36,14 +36,14 @@ def fileLayers(filename):
     return fileLayerCache[filename]
 
 
-def makeShapeFiles(sourceFile, layerName, outputTemplate):
+def makeShapeFiles(sourceFile, layerName, outputTemplate, dest_dir):
     if sourceFile.lower()[-4:] != ".dxf":
         raise Exception("Unsupported source file format: '%s'" % sourceFile)
 
     base_path = os.path.dirname(os.path.abspath(__file__))
-    variables = {'outputTemplate': outputTemplate,
+    variables = {'outputTemplate': os.path.join(dest_dir, outputTemplate),
                  'layerName': layerName,
-                 'sourceFile': sourceFile,
+                 'sourceFile': os.path.join(dest_dir, sourceFile),
                  'basePath': base_path}
 
     output = []

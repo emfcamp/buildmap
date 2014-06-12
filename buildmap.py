@@ -16,11 +16,22 @@ from util import sanitize, findFile, fileLayers, makeShapeFiles, runCommands, pa
 
 from collections import defaultdict
 
+logging.basicConfig(level=logging.INFO)
+
+def write_file(name, data):
+    with open(name, 'w') as fp:
+        fp.write(data)
+
+
 class BuildMap(object):
 
     def __init__(self, config):
         self.log = logging.getLogger(__name__)
         self.config = config
+        self.base_path = os.path.dirname(os.path.abspath(__file__))
+        self.temp_dir = os.path.join(self.base_path, 'temp')
+        shutil.rmtree(self.temp_dir, True)
+        os.makedirs(self.temp_dir)
         self.generated_layers = set()  # Layers for which we've already generated shapefiles
 
     def find_layer(self, layer_regex, source_path):
@@ -61,16 +72,11 @@ class BuildMap(object):
 
     def generate_layer_shapefile(self, source_path, source_layer, filename):
         if source_layer not in self.generated_layers:
-            runCommands(makeShapeFiles(source_path, source_layer, filename))
+            runCommands(makeShapeFiles(source_path, source_layer, filename, self.temp_dir))
             self.generated_layers.add(source_layer)
 
-    def write_file(self, name, data):
-        with open(name, 'w') as fp:
-            fp.write(data)
-
-    def build_map(self, mapDir, layers):
+    def build_map(self, layers):
         self.log.info("Generating map...")
-        os.chdir(mapDir)
         tilesDir = self.config.output_directory + "/tiles"
         tempTilesDir = tilesDir + "-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         oldTilesDir = tilesDir + "-old"
@@ -78,19 +84,22 @@ class BuildMap(object):
         self.import_layers(layers)
 
         self.log.info("Generating mapfile...")
-        self.write_file('buildmap.map', map.render_mapfile(self.map_layers, self.config))
+        write_file(os.path.join(self.temp_dir, 'buildmap.map'),
+                   map.render_mapfile(self.map_layers, self.config))
 
         self.log.info("Generating 'tilecache.cfg'...")
-        self.write_file('tilecache.cfg', tilecache.render_tilecache_file(self.map_layers, config))
+        write_file(os.path.join(self.temp_dir, 'tilecache.cfg'),
+                   tilecache.render_tilecache_file(self.map_layers, config, tempTilesDir))
 
+        base_path = os.path.dirname(os.path.abspath(__file__))
         for filename in config.mapExtraFiles:
-            shutil.copy(filename, ".")
+            shutil.copy(os.path.join(base_path, filename), self.temp_dir)
 
-        return
         commands = []
-        for layer in layers.layers:
-            commands.append("tilecache_seed.py '%s' %s" % (layer['title'], len(config.resolutions)))
-        print "Generating tiles..."
+        tilecache_config = os.path.join(self.temp_dir, 'tilecache.cfg')
+        for layer in layers:
+            commands.append("tilecache_seed.py -c %s '%s' %s" % (tilecache_config, layer['title'], len(config.resolutions)))
+        self.log.info("Generating tiles...")
         runCommands(commands)
 
         shutil.rmtree(oldTilesDir, True)
@@ -98,22 +107,14 @@ class BuildMap(object):
             shutil.move(tilesDir, oldTilesDir)
         shutil.move(tempTilesDir, tilesDir)
 
-        print "Writing 'layers.def'..."
-        layersDefStream = open(config.output_directory + '/layers.def', 'w')
-        layersDefStream.write(layersDefFile)
-        layersDefStream.close()
+        self.log.info("Writing 'layers.def'...")
+        write_file(os.path.join(self.config.output_directory, 'layers.def'),
+                   ",".join(self.layer_names(layers)))
 
-        #print "Writing 'index.html'..."
-        #htmlStream = open(config.output_directory + '/index.html', 'w')
-        #htmlStream.write(htmlFile)
-        #htmlStream.close()
-
-        os.chdir("/")
-        shutil.rmtree(mapDir, True)
-        shutil.rmtree(oldTilesDir, True)
+        self.log.info("Writing 'layers.js'...")
+        write_file(os.path.join(self.config.output_directory, 'layers.js'),
+                   html.render_html_file(self.map_layers, config))
 
 if __name__ == '__main__':
-    #mapDir = tempfile.mkdtemp("-buildmap")
-    #build_map(mapDir)
     bm = BuildMap(config)
-    bm.build_map('/Users/russ/emf/buildmap/test', layers.layers)
+    bm.build_map(layers.layers)
