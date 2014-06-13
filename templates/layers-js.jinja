@@ -12,7 +12,7 @@ new OpenLayers.Layer.TileCache(
                     maxExtent: new OpenLayers.Bounds({{config.extents|join(',')}}),
                     tileSize: new OpenLayers.Size(1024, 1024),
                     isBaseLayer: false,
-                    visibility: true,
+                    visibility: {{layer.enabled|lower}},
                     displayInLayerSwitcher: true
                 }
             )

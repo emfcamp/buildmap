@@ -1,6 +1,7 @@
 import os
 import subprocess
 import config
+from copy import copy
 
 
 def sanitize(filename):
@@ -85,32 +86,27 @@ def opaque(layer):
 
 def parse_layer_config(filename, source_layer, layer_config):
     mapLayer = sanitize(source_layer)
-    if 'color' in layer_config:
-        layer = {
-            'source': filename,
-            'description': source_layer,
-        }
+    base_layer = {
+        'source': filename,
+        'description': source_layer,
+        'enabled': layer_config.get('enabled', True)
+    }
 
+    if 'color' in layer_config:
+        layer = copy(base_layer)
         layer['type'] = 'line'
         layer['name'] = mapLayer + "-lines"
         layer['color'] = layer_config['color']
         layer['width'] = layer_config['width']
         yield layer
     if 'fill' in layer_config:
-        layer = {
-            'source': filename,
-            'description': source_layer,
-        }
-
+        layer = copy(base_layer)
         layer['type'] = 'area'
         layer['name'] = mapLayer + "-areas"
         layer['color'] = layer_config['fill']
         yield layer
     if 'text' in layer_config:
-        layer = {
-            'source': filename,
-            'description': source_layer,
-        }
+        layer = copy(base_layer)
         layer['type'] = 'point'
         layer['name'] = mapLayer + "-points"
         layer['color'] = layer_config['text']

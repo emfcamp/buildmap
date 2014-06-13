@@ -115,7 +115,7 @@ class BuildMap(object):
 
         self.log.info("Writing 'layers.js'...")
         write_file(os.path.join(self.config.output_directory, 'layers.js'),
-                   html.render_html_file(self.map_layers, config))
+                   html.render_html_file(layers, self.map_layers, config))
 
 if __name__ == '__main__':
     bm = BuildMap(config)
