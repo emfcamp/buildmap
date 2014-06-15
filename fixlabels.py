@@ -1,5 +1,7 @@
 #!/usr/bin/python
-
+""" Take DXF text formatting data exported by gdal-tools and put it into proper
+    shapefile fields so MapServer can access it.
+"""
 import sys
 import csv
 import os
