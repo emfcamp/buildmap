@@ -62,7 +62,11 @@ MAP
 {% for layer in layers %}
   LAYER
     NAME '{{layer.name}}'
+    {% if layer.type == 'area' %}
+    TYPE POLYGON
+    {% else %}
     TYPE {{layer.type|upper}}
+    {% endif %}
     {% if layer.type == 'point' %}
     DATA '{{layer.source}}-points'
     {% elif layer.type == 'area' %}
