@@ -14,7 +14,7 @@ import layers
 
 from util import sanitize, findFile, fileLayers, makeShapeFiles, runCommands, parse_layer_config
 
-from collections import defaultdict
+from collections import OrderedDict
 
 logging.basicConfig(level=logging.INFO)
 
@@ -42,10 +42,12 @@ class BuildMap(object):
 
     def import_layers(self, layers):
         """ Given a layer config, import the layers, copying the layer data from DXF to shapefile"""
-        self.map_layers = defaultdict(list)
+        self.map_layers = OrderedDict()
         for layer in layers:
             for component in layer['input']:
                 component_layers = list(self.import_layer_component(component))
+                if layer['title'] not in self.map_layers:
+                    self.map_layers[layer['title']] = []
                 self.map_layers[layer['title']] += component_layers
 
     def import_layer_component(self, component):
