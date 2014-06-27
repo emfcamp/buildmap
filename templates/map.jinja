@@ -3,6 +3,7 @@ MAP
   # Map image size
   SIZE 100 100
   UNITS meters
+  MAXSIZE 16384
 
   FONTSET './fonts.txt'
   SYMBOLSET './symbols.txt'
@@ -96,7 +97,6 @@ MAP
             ANGLE [Angle]
             COLOR {{layer.red}} {{layer.green}} {{layer.blue}}
             POSITION [Position]
-            FORCE true
             ANTIALIAS true
             PARTIALS false
          END
@@ -106,6 +106,7 @@ MAP
        {% else %}
        STYLE
          {% if layer.type == 'line' %}
+         LINECAP square
          WIDTH {{layer.width}}
          {% endif %}
          COLOR {{layer.red}} {{layer.green}} {{layer.blue}}
