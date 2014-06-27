@@ -79,6 +79,9 @@ MAP
     PROJECTION
         "init=epsg:{{config.projection}}"
     END
+    {% if layer.width_units %}
+    SIZEUNITS {{layer.width_units}}
+    {% endif %}
     {% if layer.type == 'point' %}
     LABELITEM 'Text'
     SYMBOLSCALEDENOM 2500
