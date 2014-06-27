@@ -89,7 +89,8 @@ def parse_layer_config(filename, source_layer, layer_config):
     base_layer = {
         'source': filename,
         'description': source_layer,
-        'enabled': layer_config.get('enabled', True)
+        'enabled': layer_config.get('enabled', True),
+        'width_units': layer_config.get('width_units', 'pixels')
     }
 
     if 'color' in layer_config:
