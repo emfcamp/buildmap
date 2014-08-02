@@ -10,7 +10,7 @@ mapfile=./temp/buildmap.map
 debug=off
 extension=png
 resolutions={{config.resolutions|join(",")}}
-srs=EPSG:{{config.projection}}
+srs=EPSG:{{config.dest_projection}}
 bbox={{config.extents|join(",")}}
 size=1024,1024
 {% endfor %}

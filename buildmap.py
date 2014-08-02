@@ -75,7 +75,7 @@ class BuildMap(object):
 
     def generate_layer_shapefile(self, source_path, source_layer, filename):
         if source_layer not in self.generated_layers:
-            runCommands(makeShapeFiles(source_path, source_layer, filename, self.temp_dir))
+            runCommands(makeShapeFiles(source_path, source_layer, filename, self.temp_dir, self.config))
             self.generated_layers.add(source_layer)
 
     def build_map(self, layers):

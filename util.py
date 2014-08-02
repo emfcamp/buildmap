@@ -1,3 +1,4 @@
+# encoding=utf-8
 import os
 import subprocess
 import config
@@ -37,7 +38,7 @@ def fileLayers(filename):
     return fileLayerCache[filename]
 
 
-def makeShapeFiles(sourceFile, layerName, outputTemplate, dest_dir):
+def makeShapeFiles(sourceFile, layerName, outputTemplate, dest_dir, config):
     if sourceFile.lower()[-4:] != ".dxf":
         raise Exception("Unsupported source file format: '%s'" % sourceFile)
 
@@ -45,21 +46,23 @@ def makeShapeFiles(sourceFile, layerName, outputTemplate, dest_dir):
     variables = {'outputTemplate': os.path.join(dest_dir, outputTemplate),
                  'layerName': layerName,
                  'sourceFile': os.path.join(dest_dir, sourceFile),
-                 'basePath': base_path}
+                 'basePath': base_path,
+                 'destSRS': 'epsg:%s' % config.dest_projection,
+                 'sourceSRS': 'epsg:%s' % config.source_projection}
 
     output = []
     output.append("""
-ogr2ogr -skipfailures -where "LAYER = '{layerName}'" '{outputTemplate}-lines.shp' '{sourceFile}' -nlt LINESTRING 2>/dev/null
+ogr2ogr -s_srs {sourceSRS} -t_srs {destSRS} -skipfailures -where "LAYER = '{layerName}'" '{outputTemplate}-lines.shp' '{sourceFile}' -nlt LINESTRING 2>/dev/null
 """.format(**variables))
     output.append("""
-ogr2ogr -skipfailures -where "LAYER = '{layerName}'" '{outputTemplate}-areas.shp' '{sourceFile}' -nlt POLYGON 2>/dev/null
+ogr2ogr -s_srs {sourceSRS} -t_srs {destSRS} -skipfailures -where "LAYER = '{layerName}'" '{outputTemplate}-areas.shp' '{sourceFile}' -nlt POLYGON 2>/dev/null
 """.format(**variables))
     output.append("""
-ogr2ogr -skipfailures -where "LAYER = '{layerName}'" '{outputTemplate}-points.shp' '{sourceFile}' -nlt POINT 2>/dev/null;
+ogr2ogr -s_srs {sourceSRS} -t_srs {destSRS} -skipfailures -where "LAYER = '{layerName}'" '{outputTemplate}-points.shp' '{sourceFile}' -nlt POINT 2>/dev/null;
 ogr2ogr -f CSV -skipfailures -sql 'SELECT *, OGR_STYLE FROM entities WHERE LAYER = "{layerName}"' '{outputTemplate}-points-data.csv' '{sourceFile}' -nlt POINT 2>/dev/null;
 ogr2ogr -f CSV '{outputTemplate}-points-orig.csv' '{outputTemplate}-points.shp';
 {basePath}/fixlabels.py '{outputTemplate}-points-orig.csv' '{outputTemplate}-points-data.csv' '{outputTemplate}-points-fixed.csv';
-ogr2ogr '{outputTemplate}-points-fixed.shp' '{outputTemplate}-points-fixed.csv' 2>/dev/null;
+ogr2ogr -s_srs {sourceSRS} -t_srs {destSRS} '{outputTemplate}-points-fixed.shp' '{outputTemplate}-points-fixed.csv' 2>/dev/null;
 cp '{outputTemplate}-points-fixed.dbf' '{outputTemplate}-points.dbf'
 """.format(**variables))
     return output

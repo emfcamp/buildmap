@@ -8,7 +8,7 @@ MAP
   FONTSET './fonts.txt'
   SYMBOLSET './symbols.txt'
   PROJECTION
-    "init=epsg:{{config.projection}}"
+    "init=epsg:{{config.dest_projection}}"
   END
 
   # Background color for the map canvas -- change as desired
@@ -78,7 +78,7 @@ MAP
     STATUS ON
     TRANSPARENCY {{layer.alpha}}
     PROJECTION
-        "init=epsg:{{config.projection}}"
+        "init=epsg:{{config.dest_projection}}"
     END
     {% if layer.width_units %}
     SIZEUNITS {{layer.width_units}}
