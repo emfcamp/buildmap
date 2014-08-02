@@ -12,5 +12,6 @@ extension=png
 resolutions={{config.resolutions|join(",")}}
 srs=EPSG:{{config.dest_projection}}
 bbox={{config.extents|join(",")}}
-size=1024,1024
+size=256,256
+metaTile=true
 {% endfor %}

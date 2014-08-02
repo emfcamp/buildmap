@@ -10,7 +10,7 @@ new OpenLayers.Layer.TileCache(
                     resolutions: [{{config.resolutions|join(',')}}],
                     serverResolutions: [{{config.resolutions|join(',')}}],
                     maxExtent: new OpenLayers.Bounds({{config.extents|join(',')}}),
-                    tileSize: new OpenLayers.Size(1024, 1024),
+                    tileSize: new OpenLayers.Size(256,256),
                     isBaseLayer: false,
                     visibility: {{layer.enabled|lower}},
                     displayInLayerSwitcher: true
