@@ -1,20 +1,37 @@
-# Searched for map files.
+# Name of your tilecache_seed binary. If you use tilecache from the .deb,
+# his is without the .py
+tilecache_seed_binary = 'tilecache_seed.py'
+
+# Directories where your source .dxf files live
 directories = ['/home/redlizard/ohm/terrain/ohm-gis/']
 
-# Location of the webroot directory.
-wwwDirectory = '/home/redlizard/ohm/terrain/buildmap/www'
+# Location of the webroot directory where layers.js and tiles will be placed
+output_directory = '/home/redlizard/ohm/terrain/buildmap/www'
 
-# Stuff that is copied verbatim into the map data directory.
-mapExtraFiles = ['/home/redlizard/ohm/terrain/buildmap/fonts.txt', '/home/redlizard/ohm/terrain/buildmap/symbols.txt']
+# Stuff that is copied verbatim into the map data directory, used by mapserver
+mapExtraFiles = ['fonts.txt', 'symbols.txt']
 
-# Location of the map page.
-url = 'http://floep.redlizard.nl/buildmap'
+# Location of the tile root. If you have multiple CNAMEs for your tile host,
+# you can list them here to speed up loading.
+urls = ['http://floep.redlizard.nl/buildmap']
 
-# Number of generation threads.
+# Number of tilecache/mapserver threads to run
 threads = 3
 
-# Extents of the OHM map overlay.
+# Projection of your CAD files (this will usually be a national mercator projection -
+# 27700 is OSGB38 for the UK)
+source_projection = 27700
+
+# Projection of the output tiles. 3857 is "web mercator" and allows you to use
+# OpenStreetMap as a base map.
+dest_projection = 3857
+
+# Extents of the map (in dest_projection)
 extents = (111139.840, 522289.840, 112860.160, 524010.160)
 
-# Available resolutions of the OHM map overlay.
-resolutions = [6.720, 3.360, 1.680, 0.840, 0.420, 0.210, 0.105]
+# Resolutions to generate. This should be a subset of your basemap resolutions,
+# perhaps with one or two more detailed resolutions.
+#
+# These resolutions are a subset of OSM's resolutions, with 0.25 added:
+resolutions = [9.554628534317017, 4.777314267158508, 2.388657133579254, 1.194328566789627,
+               0.5971642833948135, 0.25]
