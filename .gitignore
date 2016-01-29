@@ -54,3 +54,5 @@ layers.py
 fonts.txt
 temp/
 output/
+
+.vagrant
