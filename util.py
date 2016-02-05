@@ -67,11 +67,12 @@ cp '{outputTemplate}-points-fixed.dbf' '{outputTemplate}-points.dbf'
 """.format(**variables))
     return output
 
+
 def runCommands(commands):
     processes = {}
     while len(commands) > 0 or len(processes) > 0:
         if len(commands) > 0 and len(processes) < config.threads:
-            process = subprocess.Popen(commands[0], shell = True)
+            process = subprocess.Popen(commands[0], shell=True)
             del commands[0]
             processes[process.pid] = process
         if len(commands) == 0 or len(processes) >= config.threads:
