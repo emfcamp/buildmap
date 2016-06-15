@@ -16,6 +16,10 @@ from util import sanitise_layer, runCommands
 logging.basicConfig(level=logging.INFO)
 
 
+def parse_connection_string(cstring):
+    return dict(item.split('=') for item in cstring.split(' '))
+
+
 def write_file(name, data):
     with open(name, 'w') as fp:
         fp.write(data)
@@ -89,6 +93,7 @@ class BuildMap(object):
         return [f for f in contents if path.isfile(f)]
 
     def write_mml_file(self, mss_file, source_layers):
+        conn_info = parse_connection_string(self.config.postgres_connstring)
         layers = []
         for source_layer in source_layers:
             data_source = {
@@ -96,8 +101,11 @@ class BuildMap(object):
                 'table': "(SELECT * FROM %s WHERE layer='%s') as %s" % (source_layer[0],
                                                                         source_layer[1], source_layer[0]),
                 'type': 'postgis',
-                'dbname': 'emf_gis'  # TODO: config
+                'dbname': conn_info['dbname']
             }
+            if 'user' in conn_info:
+                data_source['user'] = conn_info['user']
+
             layer_struct = {
                 'name': sanitise_layer(source_layer[1]),
                 'id': sanitise_layer(source_layer[1]),
