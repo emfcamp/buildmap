@@ -1,21 +1,21 @@
 # Name of your tilecache_seed binary. If you use tilecache from the .deb,
-# his is without the .py
+# this is without the .py
 tilecache_seed_binary = 'tilecache_seed.py'
 
-# Directories where your source .dxf files live
-directories = ['/home/redlizard/ohm/terrain/ohm-gis/']
+# A list of source files. The key is the table name to use in Postgres.
+source_files = {'site_plan': '../gis-2016/site-plan.dxf'}
+
+# A directory containing .mss files, one per destination layer.
+styles = '../gis-2016/mss'
 
 # Location of the webroot directory where layers.js and tiles will be placed
-output_directory = '/home/redlizard/ohm/terrain/buildmap/www'
-
-# Stuff that is copied verbatim into the map data directory, used by mapserver
-mapExtraFiles = ['fonts.txt', 'symbols.txt']
+output_directory = '/home/vagrant/map.emfcamp.org'
 
 # Location of the tile root. If you have multiple CNAMEs for your tile host,
 # you can list them here to speed up loading.
-urls = ['http://floep.redlizard.nl/buildmap']
+urls = ['http://localhost:8000/tiles']
 
-# Number of tilecache/mapserver threads to run
+# Number of tilecache threads to run
 threads = 3
 
 # Projection of your CAD files (this will usually be a national mercator projection -
@@ -27,7 +27,7 @@ source_projection = 27700
 dest_projection = 3857
 
 # Extents of the map (in dest_projection)
-extents = (111139.840, 522289.840, 112860.160, 524010.160)
+extents = (-68900, 6657782, -65924, 6660310)
 
 # Resolutions to generate. This should be a subset of your basemap resolutions,
 # perhaps with one or two more detailed resolutions.
