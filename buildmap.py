@@ -1,19 +1,17 @@
 import datetime
 import os
-import re
+from os import path
 import shutil
+import subprocess
 import logging
+import time
 
-import map
-import tilecache
-import html
+import psycopg2
+import json
+from jinja2 import Environment, PackageLoader
 
 import config
-import layers
-
-from util import sanitize, findFile, fileLayers, makeShapeFiles, runCommands, parse_layer_config
-
-from collections import OrderedDict
+from util import sanitise_layer, runCommands
 
 logging.basicConfig(level=logging.INFO)
 
@@ -30,95 +28,176 @@ class BuildMap(object):
         self.config = config
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.temp_dir = os.path.join(self.base_path, 'temp')
+        self.db = psycopg2.connect(self.config.postgres_connstring)
         shutil.rmtree(self.temp_dir, True)
         os.makedirs(self.temp_dir)
-        self.generated_layers = set()  # Layers for which we've already generated shapefiles
 
-    def find_layer(self, layer_regex, source_path):
-        for source_layer in fileLayers(source_path):
-            if re.match(layer_regex + "$", source_layer):
-                return source_layer
-        return None
+    def import_dxf(self, dxf, table_name):
+        """ Import the DXF into Postgres into the specified table name, overwriting the existing table. """
+        self.log.info("Importing %s into PostGIS table %s...", dxf, table_name)
+        subprocess.check_call(['ogr2ogr',
+                               '-s_srs', 'epsg:%s' % self.config.source_projection,
+                               '-t_srs', 'epsg:%s' % self.config.dest_projection,
+                               '-sql', 'SELECT *, OGR_STYLE FROM entities',
+                               '-nln', table_name,
+                               '-f', 'PostgreSQL',
+                               '-overwrite',
+                               'PG:%s' % self.config.postgres_connstring,
+                               dxf])
 
-    def import_layers(self, layers):
-        """ Given a layer config, import the layers, copying the layer data from DXF to shapefile"""
-        self.map_layers = OrderedDict()
-        for layer in layers:
-            for component in layer['input']:
-                component_layers = list(self.import_layer_component(component))
-                if layer['title'] not in self.map_layers:
-                    self.map_layers[layer['title']] = []
-                self.map_layers[layer['title']] += component_layers
+    def clean_layers(self):
+        cur = self.db.cursor()
+        for table_name in self.config.source_files.keys():
+            # Fix newlines in labels
+            cur.execute("UPDATE %s SET text = replace(text, '^J', '\n')" % table_name)
+            # Remove "SOLID" labels from fills
+            cur.execute("UPDATE %s SET text = NULL WHERE text = 'SOLID'" % table_name)
+        cur.execute("COMMIT")
+        cur.close()
 
-    def import_layer_component(self, component):
-        for layer_regex in component['layers']:
-            source_path = findFile(component['file'])
-            if source_path is None:
-                raise Exception("Couldn't find source file '%s'" % component['file'])
+    def get_source_layers(self):
+        """ Get a list of source layers. Returns a list of (tablename, layername) tuples """
+        # Load in the layer ordering file if it exists
+        layer_order = []
+        layer_order_file = path.join(self.config.styles, 'layer_order')
+        if path.isfile(layer_order_file):
+            with open(layer_order_file, 'r') as f:
+                layer_order = [line.strip() for line in f.readlines()]
 
-            source_layer = self.find_layer(layer_regex, source_path)
-            if source_layer is None:
-                logging.warn("Couldn't find configured layer %s in DXF files", layer_regex)
-                continue
-            filename = "%s-%s" % (sanitize(component['file']), sanitize(source_layer))
-            self.generate_layer_shapefile(source_path, source_layer, filename)
-            for conf in parse_layer_config(filename, source_layer, component):
-                yield conf
+        cur = self.db.cursor()
+        results = []
+        for table_name in self.config.source_files.keys():
+            cur.execute("SELECT DISTINCT layer FROM %s" % table_name)
+            file_layers = [row[0] for row in cur.fetchall()]
 
-    def layer_names(self, layers):
-        """ Yield all possible layer names and aliases """
-        for layer in layers:
-            yield layer['title']
-            if 'aliases' in layer:
-                for alias in layer['aliases']:
-                    yield alias
+            # Add layers without a defined order to the bottom of the layer order stack
+            for layer in file_layers:
+                if layer not in layer_order:
+                    results.append((table_name, layer))
 
-    def generate_layer_shapefile(self, source_path, source_layer, filename):
-        if source_layer not in self.generated_layers:
-            runCommands(makeShapeFiles(source_path, source_layer, filename, self.temp_dir, self.config))
-            self.generated_layers.add(source_layer)
+            # Now add ordered layers on top of those
+            for layer in layer_order:
+                if layer in file_layers:
+                    results.append((table_name, layer))
+        cur.close()
+        return results
 
-    def build_map(self, layers):
+    def get_layer_css(self):
+        """ Return the paths of all CSS files (which correspond to destination layers)"""
+        contents = [path.join(self.config.styles, fname)
+                    for fname in os.listdir(self.config.styles) if '.mss' in fname]
+        return [f for f in contents if path.isfile(f)]
+
+    def write_mml_file(self, mss_file, source_layers):
+        layers = []
+        for source_layer in source_layers:
+            data_source = {
+                'extent': self.config.extents,
+                'table': "(SELECT * FROM %s WHERE layer='%s') as %s" % (source_layer[0],
+                                                                        source_layer[1], source_layer[0]),
+                'type': 'postgis',
+                'dbname': 'emf_gis'  # TODO: config
+            }
+            layer_struct = {
+                'name': sanitise_layer(source_layer[1]),
+                'id': sanitise_layer(source_layer[1]),
+                'srs': "+init=epsg:%s" % self.config.dest_projection,
+                'extent': self.config.extents,
+                'Datasource': data_source
+            }
+            layers.append(layer_struct)
+
+        mml = {'Layer': layers,
+               'Stylesheet': [path.basename(mss_file)],
+               'srs': '+init=epsg:%s' % self.config.dest_projection,
+               'name': path.basename(mss_file)
+               }
+
+        # Magnacarto doesn't seem to resolve .mss paths properly so copy the stylesheet to our temp dir.
+        shutil.copyfile(mss_file, path.join(self.temp_dir, path.basename(mss_file)))
+
+        dest_layer_name = path.splitext(path.basename(mss_file))[0]
+        dest_file = path.join(self.temp_dir, dest_layer_name + '.mml')
+        with open(dest_file, 'w') as fp:
+            json.dump(mml, fp, indent=2, sort_keys=True)
+
+        return (dest_layer_name, dest_file)
+
+    def generate_mapnik_xml(self, layer_name, mml_file):
+        # TODO: magnacarto error handling
+        output = subprocess.check_output(['magnacarto', '-mml', mml_file])
+
+        output_file = path.join(self.temp_dir, layer_name + '.xml')
+        with open(output_file, 'w') as fp:
+            fp.write(output)
+
+        return output_file
+
+    def generate_tilecache_cfg(self, dest_layers, temp_tiles_dir):
+        tilecache_config = os.path.join(self.temp_dir, 'tilecache.cfg')
+        env = Environment(loader=PackageLoader('buildmap', 'templates'))
+        template = env.get_template('tilecache.jinja')
+        write_file(tilecache_config,
+                   template.render(layers=dest_layers,
+                                   config=config, cache_directory=temp_tiles_dir))
+        return tilecache_config
+
+    def generate_layers_js(self, layer_names):
+        env = Environment(loader=PackageLoader('buildmap', 'templates'))
+        template = env.get_template('layers-js.jinja')
+        write_file(os.path.join(self.config.output_directory, 'layers.js'),
+                   template.render(layers=layer_names, config=config))
+
+    def build_map(self):
+        start_time = time.time()
         self.log.info("Generating map...")
         tilesDir = self.config.output_directory + "/tiles"
         tempTilesDir = tilesDir + "-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         oldTilesDir = tilesDir + "-old"
 
-        self.import_layers(layers)
+        #  Import each source DXF file into PostGIS
+        for table_name, dxf in self.config.source_files.iteritems():
+            self.import_dxf(dxf, table_name)
 
-        self.log.info("Generating mapfile...")
-        write_file(os.path.join(self.temp_dir, 'buildmap.map'),
-                   map.render_mapfile(self.map_layers, self.config))
+        self.clean_layers()
 
+        self.log.info("Generating map configuration...")
+        #  Fetch source layer list from PostGIS
+        source_layers = self.get_source_layers()
+
+        #  For each CartoCSS file (dest layer), generate a .mml file with all source layers
+        mml_files = []
+        for mss_file in self.get_layer_css():
+            mml_files.append(self.write_mml_file(mss_file, source_layers))
+
+        #  Call magnacarto to build a Mapnik .xml file from each destination layer .mml file.
+        dest_layers = {}
+        for layer_name, mml_file in mml_files:
+            dest_layers[layer_name] = self.generate_mapnik_xml(layer_name, mml_file)
+
+        #  Generate tilecache configuration
         self.log.info("Generating 'tilecache.cfg'...")
-        write_file(os.path.join(self.temp_dir, 'tilecache.cfg'),
-                   tilecache.render_tilecache_file(self.map_layers, config, tempTilesDir))
+        tilecache_config = self.generate_tilecache_cfg(dest_layers, tempTilesDir)
 
-        base_path = os.path.dirname(os.path.abspath(__file__))
-        for filename in config.mapExtraFiles:
-            shutil.copy(os.path.join(base_path, filename), self.temp_dir)
-
+        #  Execute tilecache on all layers
         commands = []
-        tilecache_config = os.path.join(self.temp_dir, 'tilecache.cfg')
-        for layer in layers:
+        for layer in dest_layers.keys():
             commands.append("%s -c %s '%s' %s" % (config.tilecache_seed_binary, tilecache_config,
-                                                  layer['title'], len(config.resolutions)))
+                                                  layer, len(config.resolutions)))
         self.log.info("Generating tiles...")
         runCommands(commands)
 
+        self.log.info("Moving new tiles into place...")
         shutil.rmtree(oldTilesDir, True)
         if os.path.exists(tilesDir):
             shutil.move(tilesDir, oldTilesDir)
         shutil.move(tempTilesDir, tilesDir)
 
-        self.log.info("Writing 'layers.def'...")
-        write_file(os.path.join(self.config.output_directory, 'layers.def'),
-                   ",".join(self.layer_names(layers)))
-
         self.log.info("Writing 'layers.js'...")
-        write_file(os.path.join(self.config.output_directory, 'layers.js'),
-                   html.render_html_file(layers, self.map_layers, config))
+        self.generate_layers_js(dest_layers.keys())
+
+        self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
 
 if __name__ == '__main__':
     bm = BuildMap(config)
-    bm.build_map(layers.layers)
+    bm.build_map()

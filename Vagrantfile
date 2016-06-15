@@ -5,6 +5,8 @@ Vagrant.configure(2) do |config|
   config.vm.box_version = "8.2.0"
 
   config.vm.network "forwarded_port", guest: 80, host: 8000
+  config.vm.network "forwarded_port", guest: 5432, host: 15432
+  config.vm.network "forwarded_port", guest: 8080, host: 8080
   config.vm.network "private_network", type: "dhcp"
 
   config.vm.synced_folder ".", "/home/vagrant/buildmap", type: "nfs"

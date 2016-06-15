@@ -2,16 +2,15 @@
 type=Disk
 base={{cache_directory}}
 
-{% for name, layer in layers.iteritems() %}
-[{{name}}]
-type=MapServerLayer
-layers={{layer.layer_list}}
-mapfile=./temp/buildmap.map
-debug=off
+{% for layer_name, mapfile in layers.iteritems() %}
+[{{layer_name}}]
+type=MapnikLayer
+mapfile={{mapfile}}
 extension=png
 resolutions={{config.resolutions|join(",")}}
-srs=EPSG:{{config.dest_projection}}
 bbox={{config.extents|join(",")}}
-size=256,256
+debug=true
 metaTile=true
+metaSize=8,8
+metaBuffer=40
 {% endfor %}

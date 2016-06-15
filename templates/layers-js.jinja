@@ -1,5 +1,5 @@
 map.addLayers([
-{% for name, layer in layers.iteritems() %}
+{% for name in layers %}
 {% if loop.index > 1 %},{% endif %}
 new OpenLayers.Layer.TileCache(
                 '{{name}}',
@@ -12,7 +12,7 @@ new OpenLayers.Layer.TileCache(
                     maxExtent: new OpenLayers.Bounds({{config.extents|join(',')}}),
                     tileSize: new OpenLayers.Size(256,256),
                     isBaseLayer: false,
-                    visibility: {{layer.enabled|lower}},
+                    visibility: true,
                     displayInLayerSwitcher: true
                 }
             )
