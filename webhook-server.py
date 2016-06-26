@@ -22,10 +22,8 @@ def ping(data, guid):
 @hooks.hook('push')
 def push(data, guid):
     for dirname in config.source_files.values():
-        os.chdir(os.path.join(script_location, dirname))
+        os.chdir(os.path.abspath(os.path.join(script_location, dirname)))
         subprocess.check_call(['git', 'pull'])
     os.chdir(script_location)
     subprocess.check_call(['./buildmap.py'])
     return 'OK'
-
-app.run()
