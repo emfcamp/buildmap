@@ -25,5 +25,5 @@ def push(data, guid):
         os.chdir(os.path.abspath(os.path.dirname(os.path.join(script_location, filename))))
         subprocess.check_call(['git', 'pull'])
     os.chdir(script_location)
-    subprocess.check_call(['./buildmap.py'])
+    subprocess.check_call(['python', './buildmap.py'])
     return 'OK'
