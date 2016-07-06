@@ -9,6 +9,7 @@ mapfile={{mapfile}}
 extension=png
 resolutions={{config.resolutions|join(",")}}
 bbox={{config.extents|join(",")}}
+srs=EPSG:{{config.dest_projection}}
 debug=true
 metaTile=true
 metaSize=8,8
