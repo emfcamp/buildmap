@@ -8,6 +8,7 @@ import time
 
 import psycopg2
 import json
+from collections import defaultdict
 from jinja2 import Environment, PackageLoader
 
 import config
@@ -41,7 +42,7 @@ class BuildMap(object):
         self.log.info("Importing %s into PostGIS table %s...", dxf, table_name)
         subprocess.check_call(['ogr2ogr',
                                '-s_srs', 'epsg:%s' % self.config.source_projection,
-                               '-t_srs', 'epsg:%s' % self.config.dest_projection,
+                               '-t_srs', 'epsg:%s' % self.config.source_projection,
                                '-sql', 'SELECT *, OGR_STYLE FROM entities',
                                '-nln', table_name,
                                '-f', 'PostgreSQL',
@@ -58,6 +59,39 @@ class BuildMap(object):
             cur.execute("UPDATE %s SET text = NULL WHERE text = 'SOLID'" % table_name)
         cur.execute("COMMIT")
         cur.close()
+
+    def extract_attributes(self):
+        """ Extract DXF extended attributes into columns so we can use them in Mapnik"""
+        cur = self.db.cursor()
+        for table_name in self.config.source_files.keys():
+            known_attributes = set()
+            attributes = defaultdict(list)
+            cur.execute("BEGIN")
+            cur.execute("SELECT ogc_fid, extendedentity FROM %s WHERE extendedentity IS NOT NULL" %
+                        table_name)
+            for record in cur:
+                for attr in record[1].split(' '):
+                    try:
+                        name, value = attr.split(':', 1)
+                    except ValueError:
+                        # This is ambiguous to parse, I think it's GDAL's fault for cramming them
+                        # into one field
+                        self.log.error("Cannot extract attributes as an attribute field contains a space: %s",
+                                       record[1])
+                        return
+                    known_attributes.add(name)
+                    attributes[record[0]].append((name, value))
+
+            # TODO: sanitise attribute names. There's a lot of SQL injection here.
+            for attr_name in known_attributes:
+                cur.execute("ALTER TABLE %s ADD COLUMN %s TEXT" % (table_name, attr_name))
+
+            for ogc_fid, attrs in attributes.iteritems():
+                for name, value in attrs:
+                    cur.execute("UPDATE %s SET \"%s\" = '%s' WHERE ogc_fid = %s" %
+                                (table_name, name.lower(), value, ogc_fid))
+
+            cur.execute("COMMIT")
 
     def get_source_layers(self):
         """ Get a list of source layers. Returns a list of (tablename, layername) tuples """
@@ -109,7 +143,7 @@ class BuildMap(object):
             layer_struct = {
                 'name': sanitise_layer(source_layer[1]),
                 'id': sanitise_layer(source_layer[1]),
-                'srs': "+init=epsg:%s" % self.config.dest_projection,
+                'srs': "+init=epsg:%s" % self.config.source_projection,
                 'extent': self.config.extents,
                 'Datasource': data_source
             }
@@ -167,7 +201,9 @@ class BuildMap(object):
         for table_name, dxf in self.config.source_files.iteritems():
             self.import_dxf(dxf, table_name)
 
+        self.log.info("Transforming data...")
         self.clean_layers()
+        self.extract_attributes()
 
         self.log.info("Generating map configuration...")
         #  Fetch source layer list from PostGIS
