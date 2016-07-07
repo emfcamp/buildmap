@@ -132,8 +132,9 @@ class BuildMap(object):
         for source_layer in source_layers:
             data_source = {
                 'extent': self.config.extents,
-                'table': "(SELECT * FROM %s WHERE layer='%s') as %s" % (source_layer[0],
-                                                                        source_layer[1], source_layer[0]),
+                'table': """(SELECT *, round(ST_Length(wkb_geometry)::numeric, 1) AS line_length
+                             FROM %s WHERE layer='%s') as %s""" % (source_layer[0],
+                                                                   source_layer[1], source_layer[0]),
                 'type': 'postgis',
                 'dbname': conn_info['dbname']
             }
