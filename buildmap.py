@@ -70,17 +70,17 @@ class BuildMap(object):
             cur.execute("SELECT ogc_fid, extendedentity FROM %s WHERE extendedentity IS NOT NULL" %
                         table_name)
             for record in cur:
-                for attr in record[1].split(' '):
-                    try:
+                try:
+                    for attr in record[1].split(' '):
                         name, value = attr.split(':', 1)
-                    except ValueError:
-                        # This is ambiguous to parse, I think it's GDAL's fault for cramming them
-                        # into one field
-                        self.log.error("Cannot extract attributes as an attribute field contains a space: %s",
-                                       record[1])
-                        return
-                    known_attributes.add(name)
-                    attributes[record[0]].append((name, value))
+                        known_attributes.add(name)
+                        attributes[record[0]].append((name, value))
+                except ValueError:
+                    # This is ambiguous to parse, I think it's GDAL's fault for cramming them
+                    # into one field
+                    self.log.error("Cannot extract attributes as an attribute field contains a space: %s",
+                                   record[1])
+                    continue
 
             # TODO: sanitise attribute names. There's a lot of SQL injection here.
             for attr_name in known_attributes:
