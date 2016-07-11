@@ -12,8 +12,9 @@ A Diagram
 Requirements
 ============
 
-    apt-get install postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin tilecache
-    apt-get install python-jinja2 python-mapnik
+    apt-get install postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin tilecache ttf-mscorefonts-installer
+    apt-get install python-jinja2 python-mapnik python-psycopg2 
+
 
 You'll also need to install
 [Magnacarto](https://github.com/omniscale/magnacarto) into your `$PATH`
