@@ -22,3 +22,7 @@ def runCommands(commands):
             (pid, status) = os.wait()
             if pid in processes:
                 del processes[pid]
+
+def write_file(name, data):
+    with open(name, 'w') as fp:
+        fp.write(data)
