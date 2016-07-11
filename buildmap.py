@@ -186,6 +186,9 @@ class BuildMap(object):
         return tilecache_config
 
     def generate_layers_js(self, layer_names):
+        # keep the base layer at the bottom of the stack
+        layer_names.insert(0, layer_names.pop(layer_names.index('base')))
+
         env = Environment(loader=PackageLoader('buildmap', 'templates'))
         template = env.get_template('layers-js.jinja')
         write_file(os.path.join(self.config.output_directory, 'layers.js'),
