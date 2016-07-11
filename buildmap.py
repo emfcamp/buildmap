@@ -12,18 +12,15 @@ from collections import defaultdict
 from jinja2 import Environment, PackageLoader
 
 import config
-from util import sanitise_layer, runCommands
+from util import sanitise_layer, runCommands, write_file
+from gpsexport import GPSExport
+import exportsql
 
 logging.basicConfig(level=logging.INFO)
 
 
 def parse_connection_string(cstring):
     return dict(item.split('=') for item in cstring.split(' '))
-
-
-def write_file(name, data):
-    with open(name, 'w') as fp:
-        fp.write(data)
 
 
 class BuildMap(object):
@@ -243,6 +240,10 @@ class BuildMap(object):
 
         self.log.info("Writing 'layers.js'...")
         self.generate_layers_js(dest_layers.keys())
+
+        self.log.info("Calling GPSExport...")
+        ge = GPSExport(config, exportsql.queries)
+        ge.gps_export()
 
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
 
