@@ -1,8 +1,8 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 Vagrant.configure(2) do |config|
-  config.vm.box = "debian/jessie64"
-  config.vm.box_version = "8.2.0"
+  config.vm.box = "debian/contrib-jessie64"
+  # config.vm.box_version = "8.2.0"
 
   config.vm.network "forwarded_port", guest: 80, host: 8000
   config.vm.network "forwarded_port", guest: 5432, host: 15432
@@ -14,12 +14,31 @@ Vagrant.configure(2) do |config|
   config.vm.synced_folder "../map.emfcamp.org", "/home/vagrant/map.emfcamp.org", type: "nfs"
 
   config.vm.provision "shell", inline: <<-SHELL
-     sudo apt-get update
-     sudo apt-get upgrade -y
-     sudo apt-get install -y nginx postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin tilecache
-     sudo apt-get install -y python-jinja2 python-mapscript
-     rm -f /etc/nginx/sites-enabled/000-default
+     echo "-------------------- Update OS"
+     sudo apt-get update -qq
+     sudo apt-get upgrade -q -y 
+     echo "-------------------- Install packages"
+     sudo apt-get install -q -y nginx postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin tilecache vim ttf-mscorefonts-installer
+     sudo apt-get install -q -y python-jinja2 python-mapscript python-mapnik python-psycopg2
+     echo "-------------------- Patch TileCache"
+     sudo sed -i 's/else: raise Exception(\"Zero length data returned from layer.\")/else:pass #raise Exception(\"Zero length data returned from layer.\")/' /usr/lib/pymodules/python2.7/TileCache/Service.py
+     echo "-------------------- Nginx config"
+     rm -f /etc/nginx/sites-enabled/default
      cp /home/vagrant/buildmap/etc/nginx-config /etc/nginx/sites-enabled/map.emfcamp.org
-     service nginx reload
-   SHELL
+     service nginx reload 
+     echo "-------------------- Postgress config"
+     sudo -u postgres bash -c \"psql -c \\"CREATE USER vagrant WITH PASSWORD 'vagrant';\\"\"
+     sudo -u postgres bash -c \"createdb -O vagrant -EUNICODE buildmap"
+     sudo -u postgres bash -c \"psql -d buildmap -c \\"CREATE EXTENSION postgis;\\"\"
+     sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/9.4/main/postgresql.conf
+     sudo sed -i 's|^local|local buildmap vagrant trust\\nlocal|' /etc/postgresql/9.4/main/pg_hba.conf
+     sudo sh -c "echo 'host all all 0.0.0.0/0  trust' >> /etc/postgresql/9.4/main/pg_hba.conf"
+     service postgresql reload
+     echo "-------------------- Install magnacarto"
+     wget --progress=bar:force https://download.omniscale.de/magnacarto/rel/dev-20160406-012a66a/magnacarto-dev-20160406-012a66a-linux-amd64.tar.gz
+     tar zxf magnacarto-dev-20160406-012a66a-linux-amd64.tar.gz
+     sudo cp magnacarto-dev-20160406-012a66a-linux-amd64/magnacarto /usr/bin
+     echo "-------------------- Done"
+SHELL
+
 end

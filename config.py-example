@@ -1,6 +1,9 @@
+# Postgres db connection
+postgres_connstring = "dbname='buildmap' user='vagrant'"
+
 # Name of your tilecache_seed binary. If you use tilecache from the .deb,
 # this is without the .py
-tilecache_seed_binary = 'tilecache_seed.py'
+tilecache_seed_binary = 'sudo tilecache_seed'
 
 # A list of source files. The key is the table name to use in Postgres.
 source_files = {'site_plan': '../gis-2016/site-plan.dxf'}
