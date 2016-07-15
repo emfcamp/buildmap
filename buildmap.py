@@ -1,3 +1,5 @@
+# coding=utf-8
+from __future__ import division, absolute_import, print_function, unicode_literals
 import datetime
 import os
 from os import path
@@ -6,7 +8,8 @@ import subprocess
 import logging
 import time
 
-import psycopg2
+import sqlalchemy
+from sqlalchemy.sql import text
 import json
 from collections import defaultdict
 from jinja2 import Environment, PackageLoader
@@ -16,21 +19,16 @@ from util import sanitise_layer, runCommands, write_file
 from gpsexport import GPSExport
 import exportsql
 
-logging.basicConfig(level=logging.INFO)
-
-
-def parse_connection_string(cstring):
-    return dict(item.split('=') for item in cstring.split(' '))
-
 
 class BuildMap(object):
-
     def __init__(self, config):
         self.log = logging.getLogger(__name__)
         self.config = config
+        self.db_url = sqlalchemy.engine.url.make_url(self.config.db_url)
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.temp_dir = os.path.join(self.base_path, 'temp')
-        self.db = psycopg2.connect(self.config.postgres_connstring)
+        engine = sqlalchemy.create_engine(self.db_url)
+        self.db = engine.connect()
         shutil.rmtree(self.temp_dir, True)
         os.makedirs(self.temp_dir)
 
@@ -44,51 +42,50 @@ class BuildMap(object):
                                '-nln', table_name,
                                '-f', 'PostgreSQL',
                                '-overwrite',
-                               'PG:%s' % self.config.postgres_connstring,
+                               'PG:%s' % self.db_url,
                                dxf])
 
     def clean_layers(self):
-        cur = self.db.cursor()
+        """ Tidy up some mess in Postgres which ogr2ogr makes when importing DXFs. """
         for table_name in self.config.source_files.keys():
-            # Fix newlines in labels
-            cur.execute("UPDATE %s SET text = replace(text, '^J', '\n')" % table_name)
-            # Remove "SOLID" labels from fills
-            cur.execute("UPDATE %s SET text = NULL WHERE text = 'SOLID'" % table_name)
-        cur.execute("COMMIT")
-        cur.close()
+            with self.db.begin():
+                # Fix newlines in labels
+                self.db.execute(text("UPDATE %s SET text = replace(text, '^J', '\n')" % table_name))
+                # Remove "SOLID" labels from fills
+                self.db.execute(text("UPDATE %s SET text = NULL WHERE text = 'SOLID'" % table_name))
 
     def extract_attributes(self):
         """ Extract DXF extended attributes into columns so we can use them in Mapnik"""
-        cur = self.db.cursor()
         for table_name in self.config.source_files.keys():
-            known_attributes = set()
-            attributes = defaultdict(list)
-            cur.execute("BEGIN")
-            cur.execute("SELECT ogc_fid, extendedentity FROM %s WHERE extendedentity IS NOT NULL" %
-                        table_name)
-            for record in cur:
-                try:
-                    for attr in record[1].split(' '):
-                        name, value = attr.split(':', 1)
-                        known_attributes.add(name)
-                        attributes[record[0]].append((name, value))
-                except ValueError:
-                    # This is ambiguous to parse, I think it's GDAL's fault for cramming them
-                    # into one field
-                    self.log.error("Cannot extract attributes as an attribute field contains a space: %s",
-                                   record[1])
-                    continue
+            with self.db.begin():
+                self.extract_attributes_for_table(table_name)
 
-            # TODO: sanitise attribute names. There's a lot of SQL injection here.
-            for attr_name in known_attributes:
-                cur.execute("ALTER TABLE %s ADD COLUMN %s TEXT" % (table_name, attr_name))
+    def extract_attributes_for_table(self, table_name):
+        known_attributes = set()
+        attributes = defaultdict(list)
+        result = self.db.execute(text("""SELECT ogc_fid, extendedentity FROM %s
+                                        WHERE extendedentity IS NOT NULL""" % table_name))
+        for record in result:
+            try:
+                for attr in record[1].split(' '):
+                    name, value = attr.split(':', 1)
+                    known_attributes.add(name)
+                    attributes[record[0]].append((name, value))
+            except ValueError:
+                # This is ambiguous to parse, I think it's GDAL's fault for cramming them
+                # into one field
+                self.log.error("Cannot extract attributes as an attribute field contains a space: %s",
+                               record[1])
+                continue
 
-            for ogc_fid, attrs in attributes.iteritems():
-                for name, value in attrs:
-                    cur.execute("UPDATE %s SET \"%s\" = '%s' WHERE ogc_fid = %s" %
-                                (table_name, name.lower(), value, ogc_fid))
+        for attr_name in known_attributes:
+            self.db.execute(text("ALTER TABLE %s ADD COLUMN %s TEXT" % (table_name, attr_name)))
 
-            cur.execute("COMMIT")
+        for ogc_fid, attrs in attributes.iteritems():
+            for name, value in attrs:
+                self.db.execute(text("UPDATE %s SET %s = :value WHERE ogc_fid = :fid" %
+                                     (table_name, name.lower())),
+                                value=value, fid=ogc_fid)
 
     def get_source_layers(self):
         """ Get a list of source layers. Returns a list of (tablename, layername) tuples """
@@ -99,11 +96,10 @@ class BuildMap(object):
             with open(layer_order_file, 'r') as f:
                 layer_order = [line.strip() for line in f.readlines()]
 
-        cur = self.db.cursor()
         results = []
         for table_name in self.config.source_files.keys():
-            cur.execute("SELECT DISTINCT layer FROM %s" % table_name)
-            file_layers = [row[0] for row in cur.fetchall()]
+            res = self.db.execute(text("SELECT DISTINCT layer FROM %s" % table_name))
+            file_layers = [row[0] for row in res]
 
             # Add layers without a defined order to the bottom of the layer order stack
             for layer in file_layers:
@@ -114,7 +110,6 @@ class BuildMap(object):
             for layer in layer_order:
                 if layer in file_layers:
                     results.append((table_name, layer))
-        cur.close()
         return results
 
     def get_layer_css(self):
@@ -124,7 +119,6 @@ class BuildMap(object):
         return [f for f in contents if path.isfile(f)]
 
     def write_mml_file(self, mss_file, source_layers):
-        conn_info = parse_connection_string(self.config.postgres_connstring)
         layers = []
         for source_layer in source_layers:
             data_source = {
@@ -133,10 +127,10 @@ class BuildMap(object):
                              FROM %s WHERE layer='%s') as %s""" % (source_layer[0],
                                                                    source_layer[1], source_layer[0]),
                 'type': 'postgis',
-                'dbname': conn_info['dbname']
+                'dbname': self.db_url.database
             }
-            if 'user' in conn_info:
-                data_source['user'] = conn_info['user']
+            if self.db_url.username:
+                data_source['user'] = self.db_url.username
 
             layer_struct = {
                 'name': sanitise_layer(source_layer[1]),
@@ -248,5 +242,6 @@ class BuildMap(object):
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     bm = BuildMap(config)
     bm.build_map()
