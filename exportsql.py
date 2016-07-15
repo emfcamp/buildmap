@@ -1,5 +1,6 @@
 queries = { 
 "TentCentres": """SELECT tent as name, 
+ tent_size,
  split_part(ST_AsLatLonText(ST_Transform(ST_Centroid(wkb_geometry), 4326), 'DD.DDDDDD'), ' ', 1) as lat,
  split_part(ST_AsLatLonText(ST_Transform(ST_Centroid(wkb_geometry), 4326), 'DD.DDDDDD'), ' ', 2) as long, 
  ST_AsKML(ST_Centroid(wkb_geometry)) AS kml 
