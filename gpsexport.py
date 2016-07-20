@@ -45,6 +45,10 @@ class GPSExport(object):
         template = env.get_template('kml.jinja')
         write_file(os.path.join(dir, name + '.kml'),
                    template.render(places=places))
+        if name in self.filesToList:
+            self.filesToList[name].append('kml')
+        else:
+            self.filesToList[name] = ['kml']
     
     def generate_csv(self, dir, name, places):
             with open(os.path.join(dir, name + '.csv'), 'w') as csvfile:
@@ -56,6 +60,16 @@ class GPSExport(object):
                 writer.writeheader()
                 for place in places:
                     writer.writerow(place)
+                if name in self.filesToList:
+                    self.filesToList[name].append('csv')
+                else:
+                    self.filesToList[name] = ['csv']
+
+    def generate_html(self, dir, files):
+        env = Environment(loader=PackageLoader('buildmap', 'templates'))
+        template = env.get_template('export-html.jinja')
+        write_file(os.path.join(dir, 'export.html'),
+                   template.render(files=files))
 
     def gps_export(self):
         start_time = time.time()
@@ -78,6 +92,7 @@ class GPSExport(object):
         self.log.info("Generating kml/csv files...")
         os.mkdir(tempKmlDir)
         os.mkdir(tempCsvDir)
+        self.filesToList = {}
         for name, places in results.iteritems():
             self.generate_kml(tempKmlDir, name, places)
             self.generate_csv(tempCsvDir, name, places)
@@ -93,6 +108,9 @@ class GPSExport(object):
         if os.path.exists(csvDir):
             shutil.move(csvDir, oldCsvDir)
         shutil.move(tempCsvDir, csvDir)
+
+        self.log.info("Generaring html links page")
+        self.generate_html(self.config.output_directory, self.filesToList)
 
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
 

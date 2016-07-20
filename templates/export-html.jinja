@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EMF 2016 Map exports</title>
+</head>
+<body>
+<ul>
+    {% for name, types in files.iteritems() %}
+    <li>{{name}} {% for type in types%}<a href="/{{type}}/{{name}}.{{type}}">{{type}}</a> {% endfor %}</li>
+    {% endfor %}
+</ul>
+</body>
+</html>
+
