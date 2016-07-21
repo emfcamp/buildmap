@@ -1,23 +1,22 @@
 # coding=utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
+
 import datetime
+import json
+import logging
 import os
-from os import path
 import shutil
 import subprocess
-import logging
 import time
+from collections import defaultdict
+from os import path
 
 import sqlalchemy
-from sqlalchemy.sql import text
-import json
-from collections import defaultdict
 from jinja2 import Environment, PackageLoader
+from sqlalchemy.sql import text
 
 import config
 from util import sanitise_layer, runCommands, write_file
-from gpsexport import GPSExport
-import exportsql
 
 
 class BuildMap(object):
@@ -235,9 +234,9 @@ class BuildMap(object):
         self.log.info("Writing 'layers.js'...")
         self.generate_layers_js(dest_layers.keys())
 
-        self.log.info("Calling GPSExport...")
-        ge = GPSExport(config, exportsql.queries)
-        ge.gps_export()
+        for plugin in self.config.plugins:
+            self.log.info("Running plugin %s...", plugin.__name__)
+            plugin(self.config, self.db).run()
 
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
 
