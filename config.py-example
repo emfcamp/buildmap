@@ -1,5 +1,8 @@
+# from plugins.gpsexport import GPSExport
+plugins = []
+
 # Postgres db connection
-postgres_connstring = "dbname='buildmap' user='vagrant'"
+postgres_connstring = "postgresql://127.0.0.1:5432/emf_gis"
 
 # Name of your tilecache_seed binary. If you use tilecache from the .deb,
 # this is without the .py
