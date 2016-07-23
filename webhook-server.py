@@ -22,6 +22,8 @@ def regenerate_worker():
         subprocess.check_call(['git', 'pull'])
     os.chdir(script_location)
     subprocess.check_call(['python', './buildmap.py'])
+    subprocess.check_call(['rm', '-Rf', '/tmp/stache/*'])
+    subprocess.check_call(['sudo', 'sv', 'restart', 'tilestache'])
 
 
 @hooks.hook('ping')

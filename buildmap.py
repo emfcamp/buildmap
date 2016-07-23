@@ -1,7 +1,6 @@
 # coding=utf-8
 from __future__ import division, absolute_import, print_function, unicode_literals
 
-import datetime
 import json
 import logging
 import os
@@ -12,11 +11,10 @@ from collections import defaultdict
 from os import path
 
 import sqlalchemy
-from jinja2 import Environment, PackageLoader
 from sqlalchemy.sql import text
 
 import config
-from util import sanitise_layer, runCommands, write_file
+from util import sanitise_layer
 
 
 class BuildMap(object):
@@ -25,7 +23,7 @@ class BuildMap(object):
         self.config = config
         self.db_url = sqlalchemy.engine.url.make_url(self.config.db_url)
         self.base_path = os.path.dirname(os.path.abspath(__file__))
-        self.temp_dir = os.path.join(self.base_path, 'temp')
+        self.temp_dir = os.path.join(self.base_path, 'output')
         engine = sqlalchemy.create_engine(self.db_url)
         self.db = engine.connect()
         shutil.rmtree(self.temp_dir, True)
@@ -142,7 +140,7 @@ class BuildMap(object):
 
         mml = {'Layer': layers,
                'Stylesheet': [path.basename(mss_file)],
-               'srs': '+init=epsg:%s' % self.config.dest_projection,
+               'srs': '+init=epsg:3857',
                'name': path.basename(mss_file)
                }
 
@@ -166,30 +164,60 @@ class BuildMap(object):
 
         return output_file
 
-    def generate_tilecache_cfg(self, dest_layers, temp_tiles_dir):
-        tilecache_config = os.path.join(self.temp_dir, 'tilecache.cfg')
-        env = Environment(loader=PackageLoader('buildmap', 'templates'))
-        template = env.get_template('tilecache.jinja')
-        write_file(tilecache_config,
-                   template.render(layers=dest_layers,
-                                   config=config, cache_directory=temp_tiles_dir))
-        return tilecache_config
-
-    def generate_layers_js(self, layer_names):
+    def generate_layers_config(self, layer_names):
         # keep the base layer at the bottom of the stack
         layer_names.insert(0, layer_names.pop(layer_names.index('base')))
 
-        env = Environment(loader=PackageLoader('buildmap', 'templates'))
-        template = env.get_template('layers-js.jinja')
-        write_file(os.path.join(self.config.output_directory, 'layers.js'),
-                   template.render(layers=layer_names, config=config))
+        result = {'base_url': self.config.urls[0],
+                  'extents': self.config.extents,
+                  'zoom_range': self.config.zoom_range,
+                  'layers': layer_names}
+
+        with open(os.path.join(self.config.output_directory, 'config.json'), 'w') as fp:
+            json.dump(result, fp)
+
+    def generate_tilestache_config(self, dest_layers):
+        tilestache_config = {
+            "cache": {
+                "name": "Disk",
+                "path": config.tilestache_cache_dir
+            },
+            "layers": {},
+        }
+
+        for layer_name, xml_file in dest_layers.items():
+            tilestache_config['layers'][layer_name] = {
+                "provider": {
+                    "name": "mapnik",
+                    "mapfile": xml_file,
+                },
+                "metatile": {
+                    "rows": 4,
+                    "columns": 4,
+                    "buffer": 64
+                },
+                "bounds": {
+                    "low": self.config.zoom_range[0],
+                    "high": self.config.zoom_range[1],
+                    "north": self.config.extents[0],
+                    "east": self.config.extents[1],
+                    "south": self.config.extents[2],
+                    "west": self.config.extents[3]
+                },
+                "preview": {
+                    "lat": 51.22,
+                    "lon": -0.59,
+                    "zoom": 15,
+                    "ext": "png"
+                }
+            }
+
+        with open(path.join(self.temp_dir, "tilestache.json"), "w") as fp:
+            json.dump(tilestache_config, fp)
 
     def build_map(self):
         start_time = time.time()
         self.log.info("Generating map...")
-        tilesDir = self.config.output_directory + "/tiles"
-        tempTilesDir = tilesDir + "-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        oldTilesDir = tilesDir + "-old"
 
         #  Import each source DXF file into PostGIS
         for table_name, dxf in self.config.source_files.iteritems():
@@ -217,26 +245,8 @@ class BuildMap(object):
         for layer_name, mml_file in mml_files:
             dest_layers[layer_name] = self.generate_mapnik_xml(layer_name, mml_file)
 
-        #  Generate tilecache configuration
-        self.log.info("Generating 'tilecache.cfg'...")
-        tilecache_config = self.generate_tilecache_cfg(dest_layers, tempTilesDir)
-
-        #  Execute tilecache on all layers
-        commands = []
-        for layer in dest_layers.keys():
-            commands.append("%s -c %s '%s' %s" % (config.tilecache_seed_binary, tilecache_config,
-                                                  layer, len(config.resolutions)))
-        self.log.info("Generating tiles...")
-        runCommands(commands)
-
-        self.log.info("Moving new tiles into place...")
-        shutil.rmtree(oldTilesDir, True)
-        if os.path.exists(tilesDir):
-            shutil.move(tilesDir, oldTilesDir)
-        shutil.move(tempTilesDir, tilesDir)
-
-        self.log.info("Writing 'layers.js'...")
-        self.generate_layers_js(dest_layers.keys())
+        self.generate_tilestache_config(dest_layers)
+        self.generate_layers_config(dest_layers.keys())
 
         for plugin in self.config.plugins:
             self.log.info("Running plugin %s...", plugin.__name__)

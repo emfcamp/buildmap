@@ -52,7 +52,6 @@ docs/_build/
 config.py
 layers.py
 fonts.txt
-temp/
 output/
 
 .vagrant

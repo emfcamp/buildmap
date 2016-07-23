@@ -18,10 +18,9 @@ Vagrant.configure(2) do |config|
      sudo apt-get update -qq
      sudo apt-get upgrade -q -y 
      echo "-------------------- Install packages"
-     sudo apt-get install -q -y nginx postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin tilecache vim ttf-mscorefonts-installer
-     sudo apt-get install -q -y python-jinja2 python-mapscript python-mapnik python-psycopg2
-     echo "-------------------- Patch TileCache"
-     sudo sed -i 's/else: raise Exception(\"Zero length data returned from layer.\")/else:pass #raise Exception(\"Zero length data returned from layer.\")/' /usr/lib/pymodules/python2.7/TileCache/Service.py
+     sudo apt-get install -q -y nginx postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin vim ttf-mscorefonts-installer
+     sudo apt-get install -q -y python-jinja2 python-mapscript python-mapnik python-psycopg2 python-pip runit rsync
+     sudo pip install tilestache gunicorn
      echo "-------------------- Nginx config"
      rm -f /etc/nginx/sites-enabled/default
      cp /home/vagrant/buildmap/etc/nginx-config /etc/nginx/sites-enabled/map.emfcamp.org
@@ -38,6 +37,9 @@ Vagrant.configure(2) do |config|
      wget --progress=bar:force https://download.omniscale.de/magnacarto/rel/dev-20160406-012a66a/magnacarto-dev-20160406-012a66a-linux-amd64.tar.gz
      tar zxf magnacarto-dev-20160406-012a66a-linux-amd64.tar.gz
      sudo cp magnacarto-dev-20160406-012a66a-linux-amd64/magnacarto /usr/bin
+     echo "-------------------- Set up runit for tilestache"
+     sudo rsync -av /home/vagrant/buildmap/etc/tilestache-runit /etc/sv/tilestache
+     sudo ln -s /etc/sv/tilestache /etc/service/
      echo "-------------------- Done"
 SHELL
 
