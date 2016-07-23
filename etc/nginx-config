@@ -12,4 +12,10 @@ server {
                 try_files $uri $uri/ =404;
                 autoindex on;
         }
+
+        location /tiles {
+                rewrite /tiles(.*) $1  break;
+                proxy_pass http://127.0.0.1:8080;
+        }
+
 }
