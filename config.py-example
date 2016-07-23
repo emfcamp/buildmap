@@ -14,6 +14,9 @@ source_files = {'site_plan': '../gis-2016/site-plan.dxf'}
 # A directory containing .mss files, one per destination layer.
 styles = '../gis-2016/mss'
 
+# A directory containing marker images. This will be accessible as markers/ in the .mss
+markers = '../gis-2016/markers'
+
 # Location of the webroot directory where layers.js and tiles will be placed
 output_directory = '/home/vagrant/map.emfcamp.org'
 

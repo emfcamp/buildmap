@@ -208,6 +208,10 @@ class BuildMap(object):
         for mss_file in self.get_layer_css():
             mml_files.append(self.write_mml_file(mss_file, source_layers))
 
+        # Copy marker files to temp dir
+        if self.config.markers is not None:
+            shutil.copytree(self.config.markers, path.join(self.temp_dir, 'markers'))
+
         #  Call magnacarto to build a Mapnik .xml file from each destination layer .mml file.
         dest_layers = {}
         for layer_name, mml_file in mml_files:
