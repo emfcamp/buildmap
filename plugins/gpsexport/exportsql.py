@@ -59,4 +59,12 @@ queries = {
  ST_AsKML(wkb_geometry) as kml
  FROM site_plan 
  WHERE layer = 'Paths - Fire Lane'""",
+ "FenceHeras": """SELECT 
+ split_part(ST_AsLatLonText(ST_Transform(ST_StartPoint(wkb_geometry), 4326), 'DD.DDDDDD'), ' ', 1) as start_lat,
+ split_part(ST_AsLatLonText(ST_Transform(ST_StartPoint(wkb_geometry), 4326), 'DD.DDDDDD'), ' ', 2) as start_long, 
+ split_part(ST_AsLatLonText(ST_Transform(ST_EndPoint(wkb_geometry), 4326), 'DD.DDDDDD'), ' ', 1) as end_lat,
+ split_part(ST_AsLatLonText(ST_Transform(ST_EndPoint(wkb_geometry), 4326), 'DD.DDDDDD'), ' ', 2) as end_long, 
+ ST_AsKML(wkb_geometry) as kml
+ FROM site_plan 
+ WHERE layer = 'Fence (Heras)'""",
  }
