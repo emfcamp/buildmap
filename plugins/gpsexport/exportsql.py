@@ -7,12 +7,14 @@ queries = {
  FROM site_plan 
  WHERE tent IS NOT NULL
  ORDER by name ASC""",
-"TentCorners": """SELECT DISTINCT tent as name, 
- split_part(ST_AsLatLonText(ST_Transform((ST_DumpPoints(wkb_geometry)).geom, 4326), 'DD.DDDDDD'), ' ', 1) as corner_lat,
- split_part(ST_AsLatLonText(ST_Transform((ST_DumpPoints(wkb_geometry)).geom, 4326), 'DD.DDDDDD'), ' ', 2) as corner_long
- FROM site_plan
- WHERE tent IS NOT NULL
- ORDER by name ASC""",
+"TentCorners": """
+ SELECT name, corner_lat, corner_long, ST_AsKML(ST_SetSRID(ST_MakePoint(corner_long, corner_lat), 4326)) AS kml FROM (SELECT DISTINCT tent as name,
+ST_Y(ST_Transform((ST_DumpPoints(wkb_geometry)).geom, 4326)) as   corner_lat,
+ST_X(ST_Transform((ST_DumpPoints(wkb_geometry)).geom, 4326)) as   corner_long
+   FROM site_plan
+   WHERE tent IS NOT NULL
+   ORDER by name ASC) a;
+    """,
 "Datenklo": """SELECT dk_name as name,
  split_part(ST_AsLatLonText(ST_Transform(ST_Centroid(wkb_geometry), 4326), 'DD.DDDDDD'), ' ', 1) as lat,
  split_part(ST_AsLatLonText(ST_Transform(ST_Centroid(wkb_geometry), 4326), 'DD.DDDDDD'), ' ', 2) as long, 
