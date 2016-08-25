@@ -219,7 +219,7 @@ class BuildMap(object):
                     "driver": "PostgreSQL",
                     "parameters": {
                         "dbname": self.db_url.database,
-                        "username": self.db_url.username,
+                        "user": self.db_url.username,
                         "host": self.db_url.host,
                         "port": self.db_url.port,
                         "table": source_table
