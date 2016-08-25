@@ -19,7 +19,7 @@ Vagrant.configure(2) do |config|
      sudo apt-get upgrade -q -y 
      echo "-------------------- Install packages"
      sudo apt-get install -q -y nginx postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin vim ttf-mscorefonts-installer
-     sudo apt-get install -q -y python-jinja2 python-mapscript python-mapnik python-psycopg2 python-pip runit rsync
+     sudo apt-get install -q -y python-jinja2 python-mapscript python-mapnik python-psycopg2 python-pip runit rsync python-gdal
      sudo pip install tilestache gunicorn
      echo "-------------------- Nginx config"
      rm -f /etc/nginx/sites-enabled/default

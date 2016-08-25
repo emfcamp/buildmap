@@ -13,7 +13,7 @@ Requirements
 ============
 
     apt-get install postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin tilecache ttf-mscorefonts-installer
-    apt-get install python-jinja2 python-mapnik python-psycopg2 
+    apt-get install python-jinja2 python-mapnik python-psycopg2 python-gdal
 
 
 You'll also need to install
