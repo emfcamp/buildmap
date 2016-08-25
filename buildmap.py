@@ -205,9 +205,9 @@ class BuildMap(object):
                     "west": self.config.extents[3]
                 },
                 "preview": {
-                    "lat": 51.22,
-                    "lon": -0.59,
-                    "zoom": 15,
+                    "lat": (self.config.extents[0] + self.config.extents[2]) / 2,
+                    "lon": (self.config.extents[1] + self.config.extents[3]) / 2,
+                    "zoom": self.config.zoom_range[0],
                     "ext": "png"
                 }
             }
