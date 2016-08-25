@@ -212,6 +212,18 @@ class BuildMap(object):
                 }
             }
 
+        for source_table in self.config.source_files.keys():
+            tilestache_config['layers']['vector_%s' % source_table] = {
+                "provider": {
+                    "name": "vector",
+                    "driver": "PostgreSQL",
+                    "parameters": {
+                        "dbname": self.db_url.database,
+                        "table": source_table
+                    }
+                }
+            }
+
         with open(path.join(self.temp_dir, "tilestache.json"), "w") as fp:
             json.dump(tilestache_config, fp)
 
