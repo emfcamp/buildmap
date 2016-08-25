@@ -222,7 +222,6 @@ class BuildMap(object):
                         "username": self.db_url.username,
                         "host": self.db_url.host,
                         "port": self.db_url.port,
-                        "password": self.db_url.password,
                         "table": source_table
                     }
                 }
