@@ -13,7 +13,7 @@ from . import exportsql
 
 
 class GPSExport(object):
-    def __init__(self, config, db):
+    def __init__(self, _, config, db):
         self.log = logging.getLogger(__name__)
         self.queries = exportsql.queries
         self.config = config

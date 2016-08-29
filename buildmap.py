@@ -24,6 +24,7 @@ class BuildMap(object):
         self.db_url = sqlalchemy.engine.url.make_url(self.config.db_url)
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.temp_dir = os.path.join(self.base_path, 'output')
+        self.known_attributes = set()
         engine = sqlalchemy.create_engine(self.db_url)
         self.db = engine.connect()
         shutil.rmtree(self.temp_dir, True)
@@ -58,7 +59,6 @@ class BuildMap(object):
                 self.extract_attributes_for_table(table_name)
 
     def extract_attributes_for_table(self, table_name):
-        known_attributes = set()
         attributes = defaultdict(list)
         result = self.db.execute(text("""SELECT ogc_fid, extendedentity FROM %s
                                         WHERE extendedentity IS NOT NULL""" % table_name))
@@ -66,7 +66,7 @@ class BuildMap(object):
             try:
                 for attr in record[1].split(' '):
                     name, value = attr.split(':', 1)
-                    known_attributes.add(name)
+                    self.known_attributes.add(name)
                     attributes[record[0]].append((name, value))
             except ValueError:
                 # This is ambiguous to parse, I think it's GDAL's fault for cramming them
@@ -75,7 +75,7 @@ class BuildMap(object):
                                record[1])
                 continue
 
-        for attr_name in known_attributes:
+        for attr_name in self.known_attributes:
             self.db.execute(text("ALTER TABLE %s ADD COLUMN %s TEXT" % (table_name, attr_name)))
 
         for ogc_fid, attrs in attributes.iteritems():
@@ -212,6 +212,7 @@ class BuildMap(object):
                 }
             }
 
+        # Add a vector/GeoJSON layer for each DXF
         for source_table in self.config.source_files.keys():
             tilestache_config['layers']['vector_%s' % source_table] = {
                 "provider": {
@@ -238,6 +239,7 @@ class BuildMap(object):
         for table_name, dxf in self.config.source_files.iteritems():
             self.import_dxf(dxf, table_name)
 
+        # Do some data transformation on the PostGIS table
         self.log.info("Transforming data...")
         self.clean_layers()
         self.extract_attributes()
@@ -265,7 +267,7 @@ class BuildMap(object):
 
         for plugin in self.config.plugins:
             self.log.info("Running plugin %s...", plugin.__name__)
-            plugin(self.config, self.db).run()
+            plugin(self, self.config, self.db).run()
 
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
 
