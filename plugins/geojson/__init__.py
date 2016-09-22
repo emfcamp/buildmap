@@ -1,12 +1,12 @@
 from __future__ import absolute_import
+import yaml
 import json
 import logging
 import os
+from os import path
 import shutil
 import time
 from sqlalchemy import text
-
-from util import write_file
 
 
 class GeoJSONExport(object):
@@ -27,11 +27,23 @@ class GeoJSONExport(object):
         start_time = time.time()
         self.log.info("Exporting GeoJSON layers...")
 
+        layer_file = path.join(self.config.styles, 'vector.yaml')
+        if not path.isfile(layer_file):
+            self.log.error("Can't find vector layer list (%s).", layer_file)
+            return
+        with open(layer_file, 'r') as f:
+            layers = yaml.load(f)
+
+        for layer_name, source_layers in layers.items():
+            self.log.info("Exporting vector layer %s...", layer_name)
+            self.generate_layer(layer_name, source_layers)
+
+        self.generate_layer_index(layers)
+
+        self.log.info("GeoJSON Generation complete in %.2f seconds", time.time() - start_time)
+
+    def generate_layer(self, name, source_layers):
         attributes = ",".join(self.buildmap.known_attributes)
-
-        source_layers = ["Power - 16-1", "Power - 32-1", "Power - 32-3", "Power - 63-3", "Power - 125-3",
-                         "Power - Distro"]
-
         query = """SELECT layer, %s, ST_AsGeoJSON(ST_Transform(wkb_geometry, 4326)) AS geojson
                     FROM site_plan WHERE layer = ANY (:layers)""" % attributes
 
@@ -47,6 +59,24 @@ class GeoJSONExport(object):
                     gj['properties'][attr] = feature[attr]
             result.append(gj)
 
-        with open(os.path.join(self.config.output_directory, 'test.json'), 'w') as fp:
-            json.dump(result, fp)
-        self.log.info("GeoJSON Generation complete in %.2f seconds", time.time() - start_time)
+        geojson = {
+            'type': 'FeatureCollection',
+            'crs': {
+                'type': 'name',
+                'properties': {
+                    'name': 'EPSG:4326'
+                }
+            },
+            'features': result
+        }
+
+        with open(os.path.join(self.config.output_directory, '%s.json' % name), 'w') as fp:
+            json.dump(geojson, fp)
+
+    def generate_layer_index(self, layers):
+        vector_layers = []
+        for layer_name in layers.keys():
+            vector_layers.append({"name": layer_name,
+                                  "source": "%s.json" % layer_name})
+        with open(os.path.join(self.config.output_directory, 'vector_layers.json'), 'w') as fp:
+            json.dump(vector_layers, fp)
