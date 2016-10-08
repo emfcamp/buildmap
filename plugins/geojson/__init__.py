@@ -44,7 +44,9 @@ class GeoJSONExport(object):
 
     def generate_layer(self, name, source_layers):
         attributes = ",".join(self.buildmap.known_attributes)
-        query = """SELECT layer, %s, ST_AsGeoJSON(ST_Transform(wkb_geometry, 4326)) AS geojson
+        if len(self.buildmap.known_attributes) > 0:
+            attributes += ','
+        query = """SELECT layer, %s ST_AsGeoJSON(ST_Transform(wkb_geometry, 4326)) AS geojson
                     FROM site_plan WHERE layer = ANY (:layers)""" % attributes
 
         result = []
