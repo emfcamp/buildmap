@@ -166,7 +166,8 @@ class BuildMap(object):
 
     def generate_layers_config(self, layer_names):
         # keep the base layer at the bottom of the stack
-        layer_names.insert(0, layer_names.pop(layer_names.index('base')))
+        if 'base' in layer_names:
+            layer_names.insert(0, layer_names.pop(layer_names.index('base')))
 
         result = {'base_url': self.config.urls[0],
                   'extents': self.config.extents,
