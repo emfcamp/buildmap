@@ -16,23 +16,23 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", inline: <<-SHELL
      echo "-------------------- Update OS"
      sudo apt-get update -qq
-     sudo apt-get upgrade -q -y 
+     sudo apt-get upgrade -q -y
      echo "-------------------- Install packages"
      sudo apt-get install -q -y nginx postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin vim ttf-mscorefonts-installer
      sudo apt-get install -q -y python-jinja2 python-mapscript python-mapnik python-psycopg2 python-pip runit rsync python-gdal
-     sudo pip install tilestache gunicorn
+     sudo pip install -r /home/vagrant/buildmap/requirements.txt
      echo "-------------------- Nginx config"
      rm -f /etc/nginx/sites-enabled/default
      cp /home/vagrant/buildmap/etc/nginx-config /etc/nginx/sites-enabled/map.emfcamp.org
-     service nginx reload 
-     echo "-------------------- Postgress config"
+     service nginx reload
+     echo "-------------------- Postgres config"
      sudo -u postgres bash -c \"psql -c \\"CREATE USER vagrant WITH PASSWORD 'vagrant';\\"\"
      sudo -u postgres bash -c \"createdb -O vagrant -EUNICODE buildmap"
      sudo -u postgres bash -c \"psql -d buildmap -c \\"CREATE EXTENSION postgis;\\"\"
      sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/9.4/main/postgresql.conf
      sudo sed -i 's|^local|local buildmap vagrant trust\\nlocal|' /etc/postgresql/9.4/main/pg_hba.conf
      sudo sh -c "echo 'host all all 0.0.0.0/0  trust' >> /etc/postgresql/9.4/main/pg_hba.conf"
-     service postgresql reload
+     service postgresql restart
      echo "-------------------- Install magnacarto"
      wget --progress=bar:force https://download.omniscale.de/magnacarto/rel/dev-20160406-012a66a/magnacarto-dev-20160406-012a66a-linux-amd64.tar.gz
      tar zxf magnacarto-dev-20160406-012a66a-linux-amd64.tar.gz
