@@ -25,8 +25,6 @@ class BuildMap(object):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.temp_dir = os.path.join(self.base_path, 'output')
         self.known_attributes = set()
-        engine = sqlalchemy.create_engine(self.db_url)
-        self.db = engine.connect()
         shutil.rmtree(self.temp_dir, True)
         os.makedirs(self.temp_dir)
 
@@ -232,7 +230,17 @@ class BuildMap(object):
         with open(path.join(self.temp_dir, "tilestache.json"), "w") as fp:
             json.dump(tilestache_config, fp)
 
+    def connect_db(self):
+        engine = sqlalchemy.create_engine(self.db_url)
+        try:
+            self.db = engine.connect()
+        except sqlalchemy.exc.OperationalError as e:
+            self.log.error("Error connecting to database (%s): %s", self.db_url, e)
+        return False
+
     def build_map(self):
+        if not self.connect_db():
+            return
         start_time = time.time()
         self.log.info("Generating map...")
 
