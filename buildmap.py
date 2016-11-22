@@ -30,6 +30,9 @@ class BuildMap(object):
 
     def import_dxf(self, dxf, table_name):
         """ Import the DXF into Postgres into the specified table name, overwriting the existing table. """
+        if not os.path.isfile(dxf):
+            raise Exception("Source DXF file %s does not exist" % dxf)
+
         self.log.info("Importing %s into PostGIS table %s...", dxf, table_name)
         subprocess.check_call(['ogr2ogr',
                                '-s_srs', 'epsg:%s' % self.config.source_projection,
@@ -236,7 +239,9 @@ class BuildMap(object):
             self.db = engine.connect()
         except sqlalchemy.exc.OperationalError as e:
             self.log.error("Error connecting to database (%s): %s", self.db_url, e)
-        return False
+            return False
+        self.log.info("Connected to PostGIS database %s", self.db_url)
+        return True
 
     def build_map(self):
         if not self.connect_db():
@@ -245,8 +250,12 @@ class BuildMap(object):
         self.log.info("Generating map...")
 
         #  Import each source DXF file into PostGIS
-        for table_name, dxf in self.config.source_files.iteritems():
-            self.import_dxf(dxf, table_name)
+        try:
+            for table_name, dxf in self.config.source_files.iteritems():
+                self.import_dxf(dxf, table_name)
+        except Exception as e:
+            self.log.error(e)
+            return
 
         # Do some data transformation on the PostGIS table
         self.log.info("Transforming data...")
