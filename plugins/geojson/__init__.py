@@ -17,6 +17,7 @@ class GeoJSONExport(object):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.temp_dir = os.path.join(self.base_path, 'temp')
         self.db = db
+        self.output_dir = os.path.join(self.config.output_directory, 'vector')
         shutil.rmtree(self.temp_dir, True)
         os.makedirs(self.temp_dir)
 
@@ -26,6 +27,11 @@ class GeoJSONExport(object):
     def run(self):
         start_time = time.time()
         self.log.info("Exporting GeoJSON layers...")
+
+        try:
+            os.mkdir(self.output_dir)
+        except OSError:
+            pass
 
         layer_file = path.join(self.config.styles, 'vector.yaml')
         if not path.isfile(layer_file):
@@ -72,7 +78,7 @@ class GeoJSONExport(object):
             'features': result
         }
 
-        with open(os.path.join(self.config.output_directory, '%s.json' % name), 'w') as fp:
+        with open(os.path.join(self.output_dir, '%s.json' % name), 'w') as fp:
             json.dump(geojson, fp)
 
     def generate_layer_index(self, layers):
