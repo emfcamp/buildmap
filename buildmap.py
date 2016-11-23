@@ -288,6 +288,7 @@ class BuildMap(object):
             plugin(self, self.config, self.db).run()
 
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
+        self.log.info("Layer IDs: %s", ", ".join(sanitise_layer(layer[1]) for layer in source_layers))
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
