@@ -30,8 +30,7 @@ Vagrant.configure(2) do |config|
      sudo -u postgres bash -c \"createdb -O vagrant -EUNICODE buildmap"
      sudo -u postgres bash -c \"psql -d buildmap -c \\"CREATE EXTENSION postgis;\\"\"
      sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/9.4/main/postgresql.conf
-     sudo sed -i 's|^local|local buildmap vagrant trust\\nlocal|' /etc/postgresql/9.4/main/pg_hba.conf
-     sudo sh -c "echo 'host all all 0.0.0.0/0  trust' >> /etc/postgresql/9.4/main/pg_hba.conf"
+     sudo sed -i 's|^local|local buildmap vagrant trust\\nhost all all 0.0.0.0/0  trust\\nlocal|' /etc/postgresql/9.4/main/pg_hba.conf
      service postgresql restart
      echo "-------------------- Install magnacarto"
      wget --progress=bar:force https://download.omniscale.de/magnacarto/rel/dev-20160406-012a66a/magnacarto-dev-20160406-012a66a-linux-amd64.tar.gz
