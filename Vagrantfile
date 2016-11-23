@@ -38,7 +38,7 @@ Vagrant.configure(2) do |config|
      tar zxf magnacarto-dev-20160406-012a66a-linux-amd64.tar.gz
      sudo cp magnacarto-dev-20160406-012a66a-linux-amd64/magnacarto /usr/bin
      echo "-------------------- Set up runit for tilestache"
-     sudo rsync -av /home/vagrant/buildmap/etc/tilestache-runit /etc/sv/tilestache
+     sudo rsync -av /home/vagrant/buildmap/etc/tilestache-runit/ /etc/sv/tilestache
      sudo ln -s /etc/sv/tilestache /etc/service/
      echo "-------------------- Done"
 SHELL
