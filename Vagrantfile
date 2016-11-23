@@ -18,7 +18,7 @@ Vagrant.configure(2) do |config|
      sudo apt-get update -qq
      sudo apt-get upgrade -q -y
      echo "-------------------- Install packages"
-     sudo apt-get install -q -y nginx postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin vim ttf-mscorefonts-installer
+     sudo apt-get install -q -y nginx postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin vim ttf-mscorefonts-installer python-dev
      sudo apt-get install -q -y python-jinja2 python-mapscript python-mapnik python-psycopg2 python-pip runit rsync python-gdal
      sudo pip install -r /home/vagrant/buildmap/requirements.txt
      echo "-------------------- Nginx config"
