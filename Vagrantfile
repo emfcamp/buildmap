@@ -10,8 +10,8 @@ Vagrant.configure(2) do |config|
   config.vm.network "private_network", type: "dhcp"
 
   config.vm.synced_folder ".", "/home/vagrant/buildmap", type: "nfs"
-  config.vm.synced_folder "../gis-2016", "/home/vagrant/gis-2016", type: "nfs"
-  config.vm.synced_folder "../map.emfcamp.org", "/home/vagrant/map.emfcamp.org", type: "nfs"
+  config.vm.synced_folder "../gis", "/home/vagrant/gis", type: "nfs"
+  config.vm.synced_folder "../map-web", "/home/vagrant/map-web", type: "nfs"
 
   config.vm.provision "shell", inline: <<-SHELL
      echo "-------------------- Update OS"
@@ -23,7 +23,7 @@ Vagrant.configure(2) do |config|
      sudo pip install -r /home/vagrant/buildmap/requirements.txt
      echo "-------------------- Nginx config"
      rm -f /etc/nginx/sites-enabled/default
-     cp /home/vagrant/buildmap/etc/nginx-config /etc/nginx/sites-enabled/map.emfcamp.org
+     cp /home/vagrant/buildmap/etc/nginx-config /etc/nginx/sites-enabled/map-web
      service nginx reload
      echo "-------------------- Postgres config"
      sudo -u postgres bash -c \"psql -c \\"CREATE USER vagrant WITH PASSWORD 'vagrant';\\"\"

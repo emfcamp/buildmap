@@ -2,7 +2,7 @@ server {
         listen 80 default_server;
         listen [::]:80 default_server;
 
-        root /home/vagrant/map.emfcamp.org;
+        root /home/vagrant/map-web;
 
         index index.html;
 
