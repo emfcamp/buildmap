@@ -4,7 +4,6 @@ import json
 import logging
 import os
 from os import path
-import shutil
 import time
 from sqlalchemy import text
 
@@ -15,11 +14,8 @@ class GeoJSONExport(object):
         self.buildmap = buildmap
         self.config = config
         self.base_path = os.path.dirname(os.path.abspath(__file__))
-        self.temp_dir = os.path.join(self.base_path, 'temp')
         self.db = db
         self.output_dir = os.path.join(self.config.output_directory, 'vector')
-        shutil.rmtree(self.temp_dir, True)
-        os.makedirs(self.temp_dir)
 
     def run_query(self, query, **kwargs):
         return self.db.execute(text(query), **kwargs).fetchall()
@@ -49,11 +45,13 @@ class GeoJSONExport(object):
         self.log.info("GeoJSON Generation complete in %.2f seconds", time.time() - start_time)
 
     def generate_layer(self, name, source_layers):
-        attributes = ",".join(self.buildmap.known_attributes)
-        if len(self.buildmap.known_attributes) > 0:
-            attributes += ','
+        attributes = self.buildmap.known_attributes | set(['entityhandle', 'subclasses'])
+
+        attributes_str = ",".join(attributes)
+        if len(attributes) > 0:
+            attributes_str += ','
         query = """SELECT layer, %s ST_AsGeoJSON(ST_Transform(wkb_geometry, 4326)) AS geojson
-                    FROM site_plan WHERE layer = ANY (:layers)""" % attributes
+                    FROM site_plan WHERE layer = ANY (:layers)""" % attributes_str
 
         result = []
 
@@ -62,7 +60,7 @@ class GeoJSONExport(object):
                   "geometry": json.loads(feature['geojson']),
                   "properties": {}}
             gj['properties']['layer'] = feature['layer']
-            for attr in self.buildmap.known_attributes:
+            for attr in attributes:
                 if attr in feature and feature[attr] is not None:
                     gj['properties'][attr] = feature[attr]
             result.append(gj)
