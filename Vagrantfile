@@ -1,8 +1,7 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 Vagrant.configure(2) do |config|
-  config.vm.box = "debian/contrib-jessie64"
-  # config.vm.box_version = "8.2.0"
+  config.vm.box = "bento/ubuntu-16.04"
 
   config.vm.network "forwarded_port", guest: 80, host: 8000
   config.vm.network "forwarded_port", guest: 5432, host: 15432
@@ -18,7 +17,7 @@ Vagrant.configure(2) do |config|
      sudo apt-get update -qq
      sudo apt-get upgrade -q -y
      echo "-------------------- Install packages"
-     sudo apt-get install -q -y nginx postgresql-9.4 postgresql-9.4-postgis-2.1 gdal-bin vim ttf-mscorefonts-installer python-dev
+     sudo apt-get install -q -y nginx postgresql-9.5-postgis-2.2  gdal-bin vim ttf-mscorefonts-installer python-dev
      sudo apt-get install -q -y python-jinja2 python-mapscript python-mapnik python-psycopg2 python-pip runit rsync python-gdal
      sudo pip install -r /home/vagrant/buildmap/requirements.txt
      echo "-------------------- Nginx config"
@@ -27,7 +26,7 @@ Vagrant.configure(2) do |config|
      service nginx reload
      echo "-------------------- Postgres config"
      sudo -u postgres bash -c \"psql -c \\"CREATE USER vagrant WITH PASSWORD 'vagrant';\\"\"
-     sudo -u postgres bash -c \"createdb -O vagrant -EUNICODE buildmap"
+     sudo -u postgres bash -c \"createdb -O vagrant buildmap"
      sudo -u postgres bash -c \"psql -d buildmap -c \\"CREATE EXTENSION postgis;\\"\"
      sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/9.4/main/postgresql.conf
      sudo sed -i 's|^local|local buildmap vagrant trust\\nhost all all 0.0.0.0/0  trust\\nlocal|' /etc/postgresql/9.4/main/pg_hba.conf
