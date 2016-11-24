@@ -64,16 +64,27 @@ class BuildMap(object):
         result = self.db.execute(text("""SELECT ogc_fid, extendedentity FROM %s
                                         WHERE extendedentity IS NOT NULL""" % table_name))
         for record in result:
+            # Curly braces surround some sets of attributes for some reason.
+            attrs = record[1].strip(' {}')
             try:
-                for attr in record[1].split(' '):
-                    name, value = attr.split(':', 1)
+                for attr in attrs.split(' '):
+                    # Some DXFs seem to separate keys/values with :, some with =
+                    if ':' in attr:
+                        name, value = attr.split(':', 1)
+                    elif '=' in attr:
+                        name, value = attr.split('=', 1)
+                    else:
+                        continue
+
+                    # Replace the dot character with underscore, as it's not valid in SQL
+                    name = name.replace('.', '_')
                     self.known_attributes.add(name)
                     attributes[record[0]].append((name, value))
             except ValueError:
                 # This is ambiguous to parse, I think it's GDAL's fault for cramming them
                 # into one field
                 self.log.error("Cannot extract attributes as an attribute field contains a space: %s",
-                               record[1])
+                               attrs)
                 continue
 
         for attr_name in self.known_attributes:
@@ -289,6 +300,7 @@ class BuildMap(object):
 
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
         self.log.info("Layer IDs: %s", ", ".join(sanitise_layer(layer[1]) for layer in source_layers))
+        self.log.info("Known attributes: %s", ", ".join(self.known_attributes))
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
