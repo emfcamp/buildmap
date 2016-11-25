@@ -19,7 +19,7 @@ urls = ['http://localhost:8000/tiles']
 tilestache_cache_dir = '/tmp/stache'
 
 # Extents of the map
-extents = (52.31, 5.6, 52.2, 5.45)
+extents = (52.292, 5.5405, 52.275, 5.169)
 
 zoom_range = (13, 20)
 
