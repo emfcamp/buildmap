@@ -144,9 +144,10 @@ class BuildMap(object):
                 'type': 'postgis',
                 'dbname': self.db_url.database
             }
+            if self.db_url.host:
+                data_source['host'] = self.db_url.host
             if self.db_url.username:
                 data_source['user'] = self.db_url.username
-
             if self.db_url.password:
                 data_source['password'] = self.db_url.password
 
