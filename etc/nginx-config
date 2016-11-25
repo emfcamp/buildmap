@@ -5,6 +5,7 @@ server {
         root /home/vagrant/map-web;
 
         index index.html;
+        charset UTF-8;
 
         server_name _;
 
