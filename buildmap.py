@@ -203,7 +203,8 @@ class BuildMap(object):
         tilestache_config = {
             "cache": {
                 "name": "Disk",
-                "path": config.tilestache_cache_dir
+                "path": config.tilestache_cache_dir,
+                "dirs": "portable"
             },
             "layers": {},
         }
