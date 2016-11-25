@@ -147,6 +147,9 @@ class BuildMap(object):
             if self.db_url.username:
                 data_source['user'] = self.db_url.username
 
+            if self.db_url.password:
+                data_source['password'] = self.db_url.password
+
             layer_struct = {
                 'name': sanitise_layer(source_layer[1]),
                 'id': sanitise_layer(source_layer[1]),
