@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import time
+import argparse
 from collections import defaultdict
 from os import path
 
@@ -21,6 +22,11 @@ class BuildMap(object):
     def __init__(self, config):
         self.log = logging.getLogger(__name__)
         self.config = config
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--preseed', dest='preseed', action='store_true',
+                            help="Preseed the tile cache")
+        self.args = parser.parse_args()
+
         self.db_url = sqlalchemy.engine.url.make_url(self.config.db_url)
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.temp_dir = os.path.join(self.base_path, 'output')
@@ -254,6 +260,14 @@ class BuildMap(object):
         self.log.info("Connected to PostGIS database %s", self.db_url)
         return True
 
+    def preseed(self, layers):
+        self.log.info("Preseeding layers %s", layers)
+        zoom_levels = [str(l) for l in range(self.config.zoom_range[0], self.config.zoom_range[1] + 1)]
+        for layer in layers:
+            subprocess.call(["tilestache-seed.py", "-b"] + [str(c) for c in self.config.extents] +
+                            ["-c", path.join(self.temp_dir, "tilestache.json"), "-l", layer] +
+                            zoom_levels)
+
     def build_map(self):
         if not self.connect_db():
             return
@@ -297,6 +311,9 @@ class BuildMap(object):
         for plugin in self.config.plugins:
             self.log.info("Running plugin %s...", plugin.__name__)
             plugin(self, self.config, self.db).run()
+
+        if self.args.preseed:
+            self.preseed(dest_layers)
 
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
         self.log.info("Layer IDs: %s", ", ".join(sanitise_layer(layer[1]) for layer in source_layers))
