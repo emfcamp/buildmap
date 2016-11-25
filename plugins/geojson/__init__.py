@@ -1,5 +1,4 @@
 from __future__ import absolute_import
-import yaml
 import json
 import logging
 import os
@@ -43,18 +42,18 @@ class GeoJSONExport(object):
         except OSError:
             pass
 
-        layer_file = path.join(self.config.styles, 'vector.yaml')
+        layer_file = path.join(self.config.styles, 'vector.json')
         if not path.isfile(layer_file):
             self.log.error("Can't find vector layer list (%s).", layer_file)
             return
         with open(layer_file, 'r') as f:
-            layers = yaml.load(f)
+            config = json.load(f)
 
-        for layer_name, source_layers in layers.items():
+        for layer_name, source_layers in config['layers'].items():
             self.log.info("Exporting vector layer %s...", layer_name)
             self.generate_layer(layer_name, source_layers)
 
-        self.generate_layer_index(layers)
+        self.generate_layer_index(config)
 
         self.log.info("GeoJSON Generation complete in %.2f seconds", time.time() - start_time)
 
@@ -93,10 +92,12 @@ class GeoJSONExport(object):
         with open(os.path.join(self.output_dir, '%s.json' % name), 'w') as fp:
             json.dump(geojson, fp)
 
-    def generate_layer_index(self, layers):
+    def generate_layer_index(self, config):
         vector_layers = []
-        for layer_name in layers.keys():
+        for layer_name in config['layers'].keys():
             vector_layers.append({"name": layer_name,
                                   "source": "%s.json" % layer_name})
+
+        data = {"layers": vector_layers, "styles": config['styles']}
         with open(os.path.join(self.config.output_directory, 'vector_layers.json'), 'w') as fp:
-            json.dump(vector_layers, fp)
+            json.dump(data, fp)
