@@ -49,7 +49,6 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
-local.conf
 layers.py
 fonts.txt
 output/
