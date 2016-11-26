@@ -9,14 +9,11 @@ import subprocess
 import time
 import argparse
 import hcl
-from collections import defaultdict
 from os import path
-
-import sqlalchemy
-from sqlalchemy.sql import text
 
 from .util import sanitise_layer
 from .vector import VectorExporter
+from .mapdb import MapDB
 
 
 class BuildMap(object):
@@ -30,7 +27,7 @@ class BuildMap(object):
         self.args = parser.parse_args()
 
         self.config = self.load_config(self.args.config)
-        self.db_url = sqlalchemy.engine.url.make_url(self.config['db_url'])
+        self.db = MapDB(self.config['db_url'])
 
         # Resolve any relative paths with respect to the first config file
         self.base_path = os.path.dirname(os.path.abspath(self.args.config[0]))
@@ -62,69 +59,15 @@ class BuildMap(object):
                                '-nln', table_name,
                                '-f', 'PostgreSQL',
                                '-overwrite',
-                               'PG:%s' % self.db_url,
+                               'PG:%s' % self.db.url,
                                dxf])
-
-    def clean_layers(self):
-        """ Tidy up some mess in Postgres which ogr2ogr makes when importing DXFs. """
-        for table_name in self.config['source_file'].keys():
-            with self.db.begin():
-                # Fix newlines in labels
-                self.db.execute(text("UPDATE %s SET text = replace(text, '^J', '\n')" % table_name))
-                # Remove "SOLID" labels from fills
-                self.db.execute(text("UPDATE %s SET text = NULL WHERE text = 'SOLID'" % table_name))
-
-    def extract_attributes(self):
-        """ Extract DXF extended attributes into columns so we can use them in Mapnik"""
-        for table_name in self.config['source_file'].keys():
-            with self.db.begin():
-                self.extract_attributes_for_table(table_name)
-
-    def extract_attributes_for_table(self, table_name):
-        attributes = defaultdict(list)
-        result = self.db.execute(text("""SELECT ogc_fid, extendedentity FROM %s
-                                        WHERE extendedentity IS NOT NULL""" % table_name))
-        for record in result:
-            # Curly braces surround some sets of attributes for some reason.
-            attrs = record[1].strip(' {}')
-            try:
-                for attr in attrs.split(' '):
-                    # Some DXFs seem to separate keys/values with :, some with =
-                    if ':' in attr:
-                        name, value = attr.split(':', 1)
-                    elif '=' in attr:
-                        name, value = attr.split('=', 1)
-                    else:
-                        continue
-
-                    # Replace the dot character with underscore, as it's not valid in SQL
-                    name = name.replace('.', '_')
-                    self.known_attributes.add(name)
-                    attributes[record[0]].append((name, value))
-            except ValueError:
-                # This is ambiguous to parse, I think it's GDAL's fault for cramming them
-                # into one field
-                self.log.error("Cannot extract attributes as an attribute field contains a space: %s",
-                               attrs)
-                continue
-
-        for attr_name in self.known_attributes:
-            self.db.execute(text("ALTER TABLE %s ADD COLUMN %s TEXT" % (table_name, attr_name)))
-
-        for ogc_fid, attrs in attributes.iteritems():
-            for name, value in attrs:
-                self.db.execute(text("UPDATE %s SET %s = :value WHERE ogc_fid = :fid" %
-                                     (table_name, name.lower())),
-                                value=value, fid=ogc_fid)
 
     def get_source_layers(self):
         """ Get a list of source layers. Returns a list of (tablename, layername) tuples """
         results = []
         for table_name, source_file in self.config['source_file'].items():
             layer_order = source_file.get('layers', {})
-
-            res = self.db.execute(text("SELECT DISTINCT layer FROM %s" % table_name))
-            file_layers = [row[0] for row in res]
+            file_layers = self.db.get_layers(table_name)
 
             # If we're configured to auto-import layers, add layers without a
             # defined order to the bottom of the layer order stack
@@ -151,14 +94,14 @@ class BuildMap(object):
             'extent': self.config['extents'],
             'table': query,
             'type': 'postgis',
-            'dbname': self.db_url.database
+            'dbname': self.db.url.database
         }
-        if self.db_url.host:
-            data_source['host'] = self.db_url.host
-        if self.db_url.username:
-            data_source['user'] = self.db_url.username
-        if self.db_url.password:
-            data_source['password'] = self.db_url.password
+        if self.db.url.host:
+            data_source['host'] = self.db.url.host
+        if self.db.url.username:
+            data_source['user'] = self.db.url.username
+        if self.db.url.password:
+            data_source['password'] = self.db.url.password
 
         layer_struct = {
             'name': sanitise_layer(name),
@@ -273,10 +216,10 @@ class BuildMap(object):
                     "name": "vector",
                     "driver": "PostgreSQL",
                     "parameters": {
-                        "dbname": self.db_url.database,
-                        "user": self.db_url.username,
-                        "host": self.db_url.host,
-                        "port": self.db_url.port,
+                        "dbname": self.db.url.database,
+                        "user": self.db.url.username,
+                        "host": self.db.url.host,
+                        "port": self.db.url.port,
                         "table": source_table
                     }
                 }
@@ -284,16 +227,6 @@ class BuildMap(object):
 
         with open(path.join(self.temp_dir, "tilestache.json"), "w") as fp:
             json.dump(tilestache_config, fp)
-
-    def connect_db(self):
-        engine = sqlalchemy.create_engine(self.db_url)
-        try:
-            self.db = engine.connect()
-        except sqlalchemy.exc.OperationalError as e:
-            self.log.error("Error connecting to database (%s): %s", self.db_url, e)
-            return False
-        self.log.info("Connected to PostGIS database %s", self.db_url)
-        return True
 
     def preseed(self, layers):
         self.log.info("Preseeding layers %s", layers)
@@ -304,7 +237,7 @@ class BuildMap(object):
                             zoom_levels)
 
     def build_map(self):
-        if not self.connect_db():
+        if not self.db.connect():
             return
         start_time = time.time()
         self.log.info("Generating map...")
@@ -319,8 +252,9 @@ class BuildMap(object):
 
         # Do some data transformation on the PostGIS table
         self.log.info("Transforming data...")
-        self.clean_layers()
-        self.extract_attributes()
+        for table in self.config['source_file'].keys():
+            self.db.clean_layers(table)
+            self.known_attributes |= self.db.extract_attributes(table)
 
         self.log.info("Generating map configuration...")
         #  Fetch source layer list from PostGIS
