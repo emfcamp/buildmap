@@ -47,11 +47,23 @@ Then test this with:
 
     psql -U buildmap [database name]
 
-Now copy `config.py-example` to `config.py` and configure it.
+
+Configuration
+=============
+
+You need to create two configuration files - one (local.conf) will contain
+the host-specific configuration (paths and database details), the other
+(map.conf) will contain the rendering configuration for your map.
+
+Running Buildmap
+================
+
+`python ./buildmap.py /path/to/map.conf /path/to/local.conf`
+
 
 Credits
 =======
 
 [Russ Garrett](https://github.com/russss)
 
-This is an unrecognisably-refactored fork of Redlizard's work for OHM2013.
+This is based on [Redlizard's](https://github.com/redlizard) work for OHM2013.

@@ -2,9 +2,9 @@ from __future__ import absolute_import
 import json
 import logging
 import os
-from os import path
 import time
 from sqlalchemy import text
+from .util import iterate_hcl
 
 # SQL function to create polygons from closed linestrings
 SQL_FUNCTIONS = ["""CREATE OR REPLACE FUNCTION close_linestrings(geom geometry) RETURNS geometry AS $$
@@ -18,14 +18,14 @@ END;
 $$ LANGUAGE plpgsql;"""]
 
 
-class GeoJSONExport(object):
+class VectorExporter(object):
     def __init__(self, buildmap, config, db):
         self.log = logging.getLogger(__name__)
         self.buildmap = buildmap
         self.config = config
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.db = db
-        self.output_dir = os.path.join(self.config.output_directory, 'vector')
+        self.output_dir = os.path.join(self.config['web_directory'], 'vector')
 
     def run_query(self, query, **kwargs):
         return self.db.execute(text(query), **kwargs).fetchall()
@@ -42,18 +42,11 @@ class GeoJSONExport(object):
         except OSError:
             pass
 
-        layer_file = path.join(self.config.styles, 'vector.json')
-        if not path.isfile(layer_file):
-            self.log.error("Can't find vector layer list (%s).", layer_file)
-            return
-        with open(layer_file, 'r') as f:
-            config = json.load(f)
-
-        for layer_name, source_layers in config['layers'].items():
+        for layer_name, layer in self.config['vector_layer'].items():
             self.log.info("Exporting vector layer %s...", layer_name)
-            self.generate_layer(layer_name, source_layers)
+            self.generate_layer(layer_name, layer['source_layers'])
 
-        self.generate_layer_index(config)
+        self.generate_layer_index()
 
         self.log.info("GeoJSON Generation complete in %.2f seconds", time.time() - start_time)
 
@@ -92,12 +85,30 @@ class GeoJSONExport(object):
         with open(os.path.join(self.output_dir, '%s.json' % name), 'w') as fp:
             json.dump(geojson, fp)
 
-    def generate_layer_index(self, config):
+    def generate_layer_index(self):
         vector_layers = []
-        for layer_name in config['layers'].keys():
+        for layer_name, layer in self.config['vector_layer'].items():
             vector_layers.append({"name": layer_name,
-                                  "source": "%s.json" % layer_name})
+                                  "source": "%s.json" % layer_name,
+                                  "visible": layer.get('visible', True)})
 
-        data = {"layers": vector_layers, "styles": config['styles']}
-        with open(os.path.join(self.config.output_directory, 'vector_layers.json'), 'w') as fp:
+        data = {"layers": vector_layers, "styles": self.generate_styles()}
+        with open(os.path.join(self.config['web_directory'], 'vector_layers.json'), 'w') as fp:
             json.dump(data, fp)
+
+    def generate_styles(self):
+        styles = []
+        for layer_name, layer in self.config['vector_layer'].items():
+            for source_layer, style in iterate_hcl(layer.get('layer_style', [])):
+                if 'layers' in style:
+                    for source_layer in style['layers']:
+                        styles.append({
+                            "match": {"layer": source_layer},
+                            "style": style
+                        })
+                else:
+                    styles.append({
+                        "match": {"layer": source_layer},
+                        "style": style
+                    })
+        return styles
