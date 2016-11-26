@@ -32,7 +32,7 @@ class VectorExporter(object):
 
     def run(self):
         start_time = time.time()
-        self.log.info("Exporting GeoJSON layers...")
+        self.log.info("Exporting vector layers...")
 
         for func in SQL_FUNCTIONS:
             self.db.execute(text(func))
@@ -48,7 +48,7 @@ class VectorExporter(object):
 
         self.generate_layer_index()
 
-        self.log.info("GeoJSON Generation complete in %.2f seconds", time.time() - start_time)
+        self.log.info("Vector layer generation complete in %.2f seconds", time.time() - start_time)
 
     def generate_layer(self, name, source_layers):
         attributes = self.buildmap.known_attributes | set(['entityhandle', 'subclasses'])
