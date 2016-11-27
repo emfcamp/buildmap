@@ -6,17 +6,6 @@ import time
 from sqlalchemy import text
 from .util import iterate_hcl
 
-# SQL function to create polygons from closed linestrings
-SQL_FUNCTIONS = ["""CREATE OR REPLACE FUNCTION close_linestrings(geom geometry) RETURNS geometry AS $$
-BEGIN
-  IF ST_IsClosed(geom) THEN
-    RETURN ST_MakePolygon(geom);
-  ELSE
-    RETURN geom;
-  END IF;
-END;
-$$ LANGUAGE plpgsql;"""]
-
 
 class VectorExporter(object):
     def __init__(self, buildmap, config, db):
@@ -33,9 +22,6 @@ class VectorExporter(object):
     def run(self):
         start_time = time.time()
         self.log.info("Exporting vector layers...")
-
-        for func in SQL_FUNCTIONS:
-            self.db.execute(text(func))
 
         try:
             os.mkdir(self.output_dir)
@@ -56,7 +42,7 @@ class VectorExporter(object):
         attributes_str = ",".join(attributes)
         if len(attributes) > 0:
             attributes_str += ','
-        query = """SELECT layer, %s ST_AsGeoJSON(ST_Transform(close_linestrings(wkb_geometry), 4326)) AS geojson
+        query = """SELECT layer, %s ST_AsGeoJSON(ST_Transform(wkb_geometry, 4326)) AS geojson
                     FROM site_plan WHERE layer = ANY (:layers)""" % attributes_str
 
         result = []
