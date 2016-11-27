@@ -11,7 +11,7 @@ import argparse
 import hcl
 from os import path
 
-from .util import sanitise_layer
+from .util import sanitise_layer, iterate_hcl
 from .vector import VectorExporter
 from .mapdb import MapDB
 
@@ -120,7 +120,8 @@ class BuildMap(object):
                                layer_name)
             layers.append(l)
 
-            for name, custom_layer in self.config['source_file'][table_name].get('custom_layer', {}).items():
+            custom_layers = self.config['source_file'][table_name].get('custom_layer', {})
+            for name, custom_layer in iterate_hcl(custom_layers):
                 query = custom_layer['query'].format(table=table_name)
                 sql = "(%s) AS %s" % (query, name)
                 l = self.mml_layer(sql, name)
