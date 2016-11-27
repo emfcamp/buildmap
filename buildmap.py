@@ -6,4 +6,4 @@ from buildmap.main import BuildMap
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     bm = BuildMap()
-    bm.build_map()
+    bm.run()

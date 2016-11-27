@@ -13,6 +13,7 @@ from os import path
 
 from .util import sanitise_layer, iterate_hcl
 from .vector import VectorExporter
+from .static import StaticExporter
 from .mapdb import MapDB
 
 
@@ -22,8 +23,15 @@ class BuildMap(object):
         parser = argparse.ArgumentParser(description="Mapping workflow processor")
         parser.add_argument('--preseed', dest='preseed', action='store_true',
                             help="Preseed the tile cache")
+        parser.add_argument('--static', dest='static', metavar='FILE',
+                            help="""Export the map to a static PDF file at FILE
+                                    (specify the layer with --layer)""")
+        parser.add_argument('--layer', dest='layer', metavar='NAME',
+                            help="Choose which raster layer to export statically")
         parser.add_argument('config', nargs="+",
-                            help="A list of config files. Later files override earlier ones.")
+                            help="""A list of config files. Later files override earlier ones, and
+                                  relative paths in all config files are resolved relative to the
+                                  path of the first file.""")
         self.args = parser.parse_args()
 
         self.config = self.load_config(self.args.config)
@@ -237,12 +245,24 @@ class BuildMap(object):
                             ["-c", path.join(self.temp_dir, "tilestache.json"), "-l", layer] +
                             zoom_levels)
 
-    def build_map(self):
+    def run(self):
         if not self.db.connect():
             return
+
         start_time = time.time()
         self.log.info("Generating map...")
+        dest_layers = self.build_map()
+        if self.args.static and self.args.layer:
+            self.generate_static(dest_layers)
+        else:
+            self.generate_tiles(dest_layers)
+            self.log.info("Layer IDs: %s",
+                          ", ".join(sanitise_layer(layer[1]) for layer in self.get_source_layers()))
+            self.log.info("Known attributes: %s", ", ".join(self.known_attributes))
 
+        self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
+
+    def build_map(self):
         #  Import each source DXF file into PostGIS
         try:
             for table_name, source_file_data in self.config['source_file'].iteritems():
@@ -276,6 +296,9 @@ class BuildMap(object):
         for layer_name, mml_file in mml_files:
             dest_layers[layer_name] = self.generate_mapnik_xml(layer_name, mml_file)
 
+        return dest_layers
+
+    def generate_tiles(self, dest_layers):
         self.generate_tilestache_config(dest_layers)
         self.generate_layers_config()
 
@@ -289,6 +312,11 @@ class BuildMap(object):
         if self.args.preseed:
             self.preseed(dest_layers)
 
-        self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
-        self.log.info("Layer IDs: %s", ", ".join(sanitise_layer(layer[1]) for layer in source_layers))
-        self.log.info("Known attributes: %s", ", ".join(self.known_attributes))
+    def generate_static(self, dest_layers):
+        for layer_name, mapnik_xml in dest_layers.items():
+            if layer_name.lower() == self.args.layer.lower():
+                StaticExporter(self.config).export(mapnik_xml, self.args.static)
+                break
+        else:
+            self.log.error("Requested static layer (%s) not found", self.args.layer)
+            return
