@@ -42,7 +42,7 @@ class VectorExporter(object):
         attributes_str = ",".join(attributes)
         if len(attributes) > 0:
             attributes_str += ','
-        query = """SELECT layer, %s ST_AsGeoJSON(ST_Transform(wkb_geometry, 4326)) AS geojson
+        query = """SELECT layer, text, %s ST_AsGeoJSON(ST_Transform(wkb_geometry, 4326)) AS geojson
                     FROM site_plan WHERE layer = ANY (:layers)""" % attributes_str
 
         result = []
@@ -52,6 +52,7 @@ class VectorExporter(object):
                   "geometry": json.loads(feature['geojson']),
                   "properties": {}}
             gj['properties']['layer'] = feature['layer']
+            gj['properties']['text'] = feature['text']
             for attr in attributes:
                 if attr in feature and feature[attr] is not None:
                     gj['properties'][attr] = feature[attr]
