@@ -3,3 +3,4 @@ gunicorn
 sqlalchemy
 pyyaml
 argparse
+pyhcl
