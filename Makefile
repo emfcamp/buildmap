@@ -2,4 +2,4 @@
 	./env/bin/pip install -r ./requirements.txt && cp ./requirements.txt ./env/requirements.built
 
 env:
-	virtualenv ./env
+	virtualenv --system-site-packages ./env
