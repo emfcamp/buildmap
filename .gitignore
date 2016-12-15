@@ -52,5 +52,6 @@ docs/_build/
 layers.py
 fonts.txt
 output/
+env/
 
 .vagrant
