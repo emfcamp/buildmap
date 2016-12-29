@@ -1,23 +1,23 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 Vagrant.configure(2) do |config|
-  config.vm.box = "bento/ubuntu-16.04"
+  config.vm.box = "debian/contrib-jessie64"
 
   config.vm.network "forwarded_port", guest: 80, host: 8000
   config.vm.network "forwarded_port", guest: 5432, host: 15432
   config.vm.network "forwarded_port", guest: 8080, host: 8080
   config.vm.network "private_network", type: "dhcp"
 
-  config.vm.synced_folder ".", "/home/vagrant/buildmap", type: "nfs"
-  config.vm.synced_folder "../gis", "/home/vagrant/gis", type: "nfs"
-  config.vm.synced_folder "../map-web", "/home/vagrant/map-web", type: "nfs"
+  config.vm.synced_folder ".", "/home/vagrant/buildmap"
+  config.vm.synced_folder "../gis", "/home/vagrant/gis"
+  config.vm.synced_folder "../map-web", "/home/vagrant/map-web"
 
   config.vm.provision "shell", inline: <<-SHELL
      echo "-------------------- Update OS"
      sudo apt-get update -qq
      sudo apt-get upgrade -q -y
      echo "-------------------- Install packages"
-     sudo apt-get install -q -y nginx postgresql-9.5-postgis-2.2  gdal-bin vim ttf-mscorefonts-installer python-dev
+     sudo apt-get install -q -y nginx postgis gdal-bin vim ttf-mscorefonts-installer python-dev
      sudo apt-get install -q -y python-jinja2 python-mapscript python-mapnik python-psycopg2 python-pip runit rsync python-gdal
      sudo pip install -r /home/vagrant/buildmap/requirements.txt
      echo "-------------------- Nginx config"
