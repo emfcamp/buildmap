@@ -101,10 +101,11 @@ polygons with holes in (such as lakes with islands).
 Some versions of GDAL produce lots of unintentional areas when rendering
 hatches. The following is a limited list of versions:
 
-* GDAL 1.10.1 (Issues with hatching)
-* GDAL 1.11.3 (Known working with no hatching issues)
-* GDAL 1.11.5 (Possible issues reported)
-* GDAL 2.1.1 (Possible issues reported)
+* GDAL 1.10.1: Confirmed issues with hatching
+* GDAL 1.11.3: Known working
+* GDAL 1.11.5: Possible issues
+* GDAL 2.1.1: Possible issues
+* GDAL 2.1.2: Known working
 
 Credits
 =======
