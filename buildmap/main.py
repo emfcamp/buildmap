@@ -247,7 +247,7 @@ class BuildMap(object):
 
         zoom_levels = [str(l) for l in range(self.config['zoom_range'][0], self.config['zoom_range'][1] + 1)]
         for layer in layers:
-            subprocess.call([tilestache_seed, "-b"] + [str(c) for c in self.config['extents']] +
+            subprocess.call([tilestache_seed, "-x", "-b"] + [str(c) for c in self.config['extents']] +
                             ["-c", path.join(self.temp_dir, "tilestache.json"), "-l", layer] +
                             zoom_levels)
 
