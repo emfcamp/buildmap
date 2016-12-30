@@ -9,6 +9,7 @@ import subprocess
 import time
 import argparse
 import hcl
+import distutils.spawn
 from os import path
 
 from .util import sanitise_layer, iterate_hcl
@@ -239,9 +240,14 @@ class BuildMap(object):
 
     def preseed(self, layers):
         self.log.info("Preseeding layers %s", layers)
+        for filename in ('tilestache-seed', 'tilestache-seed.py'):
+            tilestache_seed = distutils.spawn.find_executable(filename)
+            if tilestache_seed is not None:
+                break
+
         zoom_levels = [str(l) for l in range(self.config['zoom_range'][0], self.config['zoom_range'][1] + 1)]
         for layer in layers:
-            subprocess.call(["tilestache-seed.py", "-b"] + [str(c) for c in self.config['extents']] +
+            subprocess.call([tilestache_seed, "-b"] + [str(c) for c in self.config['extents']] +
                             ["-c", path.join(self.temp_dir, "tilestache.json"), "-l", layer] +
                             zoom_levels)
 
