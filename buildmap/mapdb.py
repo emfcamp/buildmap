@@ -77,6 +77,8 @@ class MapDB(object):
                                       WHERE ST_IsClosed(wkb_geometry)
                                       AND ST_GeometryType(wkb_geometry) = 'ST_LineString'
                                       AND ST_NumPoints(wkb_geometry) > 3""" % table_name))
+            # Force geometries to use right-hand rule
+            self.conn.execute(text("UPDATE %s SET wkb_geometry = ST_ForceRHR(wkb_geometry)" % table_name))
 
     def get_layers(self, table_name):
         res = self.conn.execute(text("SELECT DISTINCT layer FROM %s" % table_name))
