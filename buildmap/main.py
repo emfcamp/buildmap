@@ -80,7 +80,7 @@ class BuildMap(object):
 
             # If we're configured to auto-import layers, add layers without a
             # defined order to the bottom of the layer order stack
-            if source_file.get('auto_import_layers', True):
+            if source_file.get('auto_import_layers', "true") == "true":
                 for layer in file_layers:
                     if layer not in layer_order:
                         results.append((table_name, layer))
@@ -173,7 +173,7 @@ class BuildMap(object):
         for layer in layers:
             layer_list.append({'name': layer[0],
                                'path': path.splitext(path.basename(layer[1]['stylesheet']))[0],
-                               'visible': layer[1].get('visible', True)})
+                               'visible': layer[1].get('visible', "true") == "true"})
 
         result = {'extents': self.config['extents'],
                   'zoom_range': self.config['zoom_range'],

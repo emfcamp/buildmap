@@ -1,6 +1,8 @@
-tilestache
+#tilestache
 gunicorn
 sqlalchemy
 pyyaml
 argparse
 pyhcl
+mapnik
+psycopg2
