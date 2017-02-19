@@ -3,6 +3,7 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 from collections import defaultdict
 import logging
 import sqlalchemy
+from shapely import wkt
 from sqlalchemy.sql import text
 
 
@@ -64,6 +65,14 @@ class MapDB(object):
                 self.conn.execute(text("UPDATE %s SET %s = :value WHERE ogc_fid = :fid" %
                                   (table_name, name.lower())), value=value, fid=ogc_fid)
         return known_attributes
+
+    def get_bounds(self, table_name, srs=4326):
+        # Performance note: it's neater to transform coordinates to the target SRS before
+        # running ST_Extent, as it doesn't require us knowing what the table SRS is, but
+        # this is obviously much slower. It doesn't seem to be an issue so far though.
+        res = self.conn.execute(text("SELECT ST_AsEWKT(ST_Extent(ST_Transform(wkb_geometry, %s))) FROM %s"
+                                     % (srs, table_name))).first()
+        return wkt.loads(res[0])
 
     def clean_layers(self, table_name):
         """ Tidy up some mess in Postgres which ogr2ogr makes when importing DXFs. """

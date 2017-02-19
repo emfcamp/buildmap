@@ -9,6 +9,7 @@ import subprocess
 import time
 import argparse
 import distutils.spawn
+from shapely.geometry import MultiPolygon
 from os import path
 
 from .util import sanitise_layer
@@ -98,7 +99,7 @@ class BuildMap(object):
 
     def mml_layer(self, query, name):
         data_source = {
-            'extent': self.config['extents'],
+            'extent': self.extents,
             'table': query,
             'type': 'postgis',
             'dbname': self.db.url.database
@@ -114,7 +115,7 @@ class BuildMap(object):
             'name': sanitise_layer(name),
             'id': sanitise_layer(name),
             'srs': "+init=%s" % self.config['source_projection'],
-            'extent': self.config['extents'],
+            'extent': self.extents,
             'Datasource': data_source
         }
         return layer_struct
@@ -136,7 +137,7 @@ class BuildMap(object):
 
         mml = {'Layer': layers,
                'Stylesheet': [path.basename(mss_file)],
-               'srs': '+init=epsg:3857',
+               'srs': '+init=%s' % self.dest_projection,
                'name': path.basename(mss_file)
                }
 
@@ -173,7 +174,7 @@ class BuildMap(object):
                                'path': path.splitext(path.basename(layer[1]['stylesheet']))[0],
                                'visible': layer[1].get('visible', "true") == "true"})
 
-        result = {'extents': self.config['extents'],
+        result = {'extents': self.extents,
                   'zoom_range': self.config['zoom_range'],
                   'layers': layer_list}
 
@@ -204,14 +205,14 @@ class BuildMap(object):
                 "bounds": {
                     "low": self.config['zoom_range'][0],
                     "high": self.config['zoom_range'][1],
-                    "north": self.config['extents'][0],
-                    "east": self.config['extents'][1],
-                    "south": self.config['extents'][2],
-                    "west": self.config['extents'][3]
+                    "north": self.extents[0],
+                    "east": self.extents[1],
+                    "south": self.extents[2],
+                    "west": self.extents[3]
                 },
                 "preview": {
-                    "lat": (self.config['extents'][0] + self.config['extents'][2]) / 2,
-                    "lon": (self.config['extents'][1] + self.config['extents'][3]) / 2,
+                    "lat": (self.extents[0] + self.extents[2]) / 2,
+                    "lon": (self.extents[1] + self.extents[3]) / 2,
                     "zoom": self.config['zoom_range'][0],
                     "ext": "png"
                 }
@@ -245,9 +246,22 @@ class BuildMap(object):
 
         zoom_levels = [str(l) for l in range(self.config['zoom_range'][0], self.config['zoom_range'][1] + 1)]
         for layer in layers:
-            subprocess.call([tilestache_seed, "-x", "-b"] + [str(c) for c in self.config['extents']] +
+            subprocess.call([tilestache_seed, "-x", "-b"] + [str(c) for c in self.extents] +
                             ["-c", path.join(self.temp_dir, "tilestache.json"), "-l", layer] +
                             zoom_levels)
+
+    def get_extents(self):
+        """ Return extents of the map, in WGS84 coordinates (north, east, south, west) """
+        if 'extents' in self.config:
+            return self.config['extents']
+        else:
+            # Combine extents of all tables
+            bboxes = []
+            for table_name in self.config['source_file'].keys():
+                bboxes.append(self.db.get_bounds(table_name))
+            bounds = MultiPolygon(bboxes).bounds
+            # Bounds here are (minx, miny, maxx, maxy)
+            return [bounds[3], bounds[2], bounds[1], bounds[0]]
 
     def run(self):
         if not self.db.connect():
@@ -255,8 +269,16 @@ class BuildMap(object):
 
         start_time = time.time()
         self.log.info("Generating map...")
+
+        if self.args.static:
+            # If we're rendering to a static file, keep the source projection intact
+            self.dest_projection = self.config['source_projection']
+        else:
+            # If we're rendering to the web, we want to use Web Mercator
+            self.dest_projection = 'epsg:3857'
+
         dest_layers = self.build_map()
-        if self.args.static and self.args.layer:
+        if self.args.static:
             self.generate_static(dest_layers)
         else:
             self.generate_tiles(dest_layers)
@@ -274,6 +296,9 @@ class BuildMap(object):
         except Exception as e:
             self.log.error(e)
             return
+
+        self.extents = self.get_extents()
+        self.log.info("Map extents (N,E,S,W): %s", self.extents)
 
         # Do some data transformation on the PostGIS table
         self.log.info("Transforming data...")
