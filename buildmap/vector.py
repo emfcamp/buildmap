@@ -134,7 +134,9 @@ class VectorExporter(object):
         for layer in self.config['vector_layer']:
             vector_layers.append({"name": layer['name'],
                                   "source": "%s.json" % layer['name'],
-                                  "visible": layer.get('visible', "true") == "true"})
+                                  "visible": layer.get('visible', "true") == "true",
+                                  "z-index": layer.get('z-index', 0)
+                                })
 
         data = {"layers": vector_layers, "styles": self.generate_styles()}
         with open(os.path.join(self.config['web_directory'], 'vector_layers.json'), 'w') as fp:
