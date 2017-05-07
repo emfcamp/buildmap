@@ -4,7 +4,6 @@ import logging
 import os
 import time
 from sqlalchemy import text
-from .util import iterate_hcl
 
 
 class VectorExporter(object):
@@ -28,13 +27,22 @@ class VectorExporter(object):
         except OSError:
             pass
 
-        for layer_name, layer in self.config['vector_layer'].items():
+        for layer in self.config['vector_layer']:
+            layer_name = layer['name']
             self.log.info("Exporting vector layer %s...", layer_name)
-            self.generate_layer(layer_name, layer['source_layers'])
+            self.generate_layer(layer_name, self.source_layers(layer))
 
         self.generate_layer_index()
 
         self.log.info("Vector layer generation complete in %.2f seconds", time.time() - start_time)
+
+    def source_layers(self, layer):
+        result = []
+        for layer_name, style in layer['layer_style'].items():
+            if 'layers' in style:
+                result.extend(style['layers'])
+            result.append(layer_name)
+        return result
 
     def parse_text_style(self, encoded):
         # LABEL(f:"Arial",t:"A/V",s:2g,p:5,c:#000026)
@@ -123,9 +131,9 @@ class VectorExporter(object):
 
     def generate_layer_index(self):
         vector_layers = []
-        for layer_name, layer in self.config['vector_layer'].items():
-            vector_layers.append({"name": layer_name,
-                                  "source": "%s.json" % layer_name,
+        for layer in self.config['vector_layer']:
+            vector_layers.append({"name": layer['name'],
+                                  "source": "%s.json" % layer['name'],
                                   "visible": layer.get('visible', "true") == "true"})
 
         data = {"layers": vector_layers, "styles": self.generate_styles()}
@@ -134,8 +142,8 @@ class VectorExporter(object):
 
     def generate_styles(self):
         styles = []
-        for layer_name, layer in self.config['vector_layer'].items():
-            for source_layer, style in iterate_hcl(layer.get('layer_style', [])):
+        for layer in self.config['vector_layer']:
+            for source_layer, style in layer.get('layer_style', []).items():
                 if 'layers' in style:
                     for source_layer in style['layers']:
                         styles.append({

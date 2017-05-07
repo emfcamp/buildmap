@@ -8,15 +8,13 @@ import shutil
 import subprocess
 import time
 import argparse
-import hcl
 import distutils.spawn
 from os import path
 
-from .util import sanitise_layer, iterate_hcl
+from .util import sanitise_layer
 from .vector import VectorExporter
 from .static import StaticExporter
 from .mapdb import MapDB
-
 
 class BuildMap(object):
     def __init__(self):
@@ -49,7 +47,7 @@ class BuildMap(object):
         config = {}
         for filename in config_files:
             with open(filename, 'r') as fp:
-                config.update(hcl.load(fp))
+                config.update(json.load(fp))
         return config
 
     def resolve_path(self, path):
@@ -94,7 +92,7 @@ class BuildMap(object):
     def get_layer_css(self):
         """ Return the paths of all CSS files (which correspond to destination layers)"""
         files = []
-        for name, layer in self.config['raster_layer'].items():
+        for layer in self.config['raster_layer']:
             files.append(path.join(self.resolve_path(self.config['stylesheet_path']), layer['stylesheet']))
         return [f for f in files if path.isfile(f)]
 
@@ -130,7 +128,7 @@ class BuildMap(object):
             layers.append(l)
 
             custom_layers = self.config['source_file'][table_name].get('custom_layer', {})
-            for name, custom_layer in iterate_hcl(custom_layers):
+            for name, custom_layer in custom_layers.items():
                 query = custom_layer['query'].format(table=table_name)
                 sql = "(%s) AS %s" % (query, name)
                 l = self.mml_layer(sql, name)
@@ -164,8 +162,8 @@ class BuildMap(object):
 
     def generate_layers_config(self):
         layers = []
-        for name, layer in self.config['raster_layer'].items():
-            layers.append((name, layer))
+        for layer in self.config['raster_layer']:
+            layers.append((layer['name'], layer))
 
         layers = sorted(layers, key=lambda l: l[1].get('z-index', 0))
 
@@ -240,7 +238,7 @@ class BuildMap(object):
 
     def preseed(self, layers):
         self.log.info("Preseeding layers %s", layers)
-        for filename in ('tilestache-seed', 'tilestache-seed.py'):
+        for filename in ('tilestache-seed.py', 'tilestache-seed'):
             tilestache_seed = distutils.spawn.find_executable(filename)
             if tilestache_seed is not None:
                 break
