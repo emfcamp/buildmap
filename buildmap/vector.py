@@ -141,18 +141,17 @@ class VectorExporter(object):
             json.dump(data, fp, indent=4)
 
     def generate_styles(self):
-        styles = []
+        styles = {}
         for layer in self.config['vector_layer']:
+            layer_style = {}
             for source_layer, style in layer.get('layer_style', []).items():
-                if 'layers' in style:
-                    for source_layer in style['layers']:
-                        styles.append({
-                            "match": {"layer": source_layer},
-                            "style": style
-                        })
+                clean_style = dict(style)
+                if 'layers' in clean_style:
+                    effective_layers = clean_style['layers']
+                    del clean_style['layers']
                 else:
-                    styles.append({
-                        "match": {"layer": source_layer},
-                        "style": style
-                    })
+                    effective_layers = [source_layer]
+                for effective_layer in effective_layers:
+                    layer_style[effective_layer] = clean_style
+            styles[layer['name']] = layer_style
         return styles
