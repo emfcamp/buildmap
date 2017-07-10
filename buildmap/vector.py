@@ -10,6 +10,7 @@ class VectorExporter(object):
     def __init__(self, buildmap, config, db):
         self.log = logging.getLogger(__name__)
         self.buildmap = buildmap
+        self.source_tables = dict((table, layer) for layer, table in buildmap.source_layers)
         self.config = config
         self.base_path = os.path.dirname(os.path.abspath(__file__))
         self.db = db
@@ -41,7 +42,8 @@ class VectorExporter(object):
         for layer_name, style in layer['layer_style'].items():
             if 'layers' in style:
                 result.extend(style['layers'])
-            result.append(layer_name)
+            else:
+                result.append(layer_name)
         return result
 
     def parse_text_style(self, encoded):
@@ -85,13 +87,22 @@ class VectorExporter(object):
         return style
 
     def generate_layer(self, name, source_layers):
-        attributes = self.buildmap.known_attributes | set(['entityhandle', 'subclasses'])
+        for layer in source_layers:
+            if layer not in self.source_tables:
+                self.log.error("Source layer '%s' is unknown. Make sure it's defined in the config.", layer)
+                return
 
+        # NB: this assumes all source layers for a vector layer exist in the
+        # same source table (i.e. come from the same DXF).
+        source_table = self.source_tables[source_layers[0]]
+
+        attributes = self.buildmap.known_attributes[source_table] | set(['entityhandle', 'subclasses'])
         attributes_str = ",".join(attributes)
         if len(attributes) > 0:
             attributes_str += ','
+
         query = """SELECT layer, text, ogr_style, %s ST_AsGeoJSON(ST_Transform(wkb_geometry, 4326)) AS geojson
-                    FROM site_plan WHERE layer = ANY (:layers)""" % attributes_str
+                    FROM %s WHERE layer = ANY (:layers)""" % (attributes_str, source_table)
 
         result = []
 

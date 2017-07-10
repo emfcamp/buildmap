@@ -9,6 +9,7 @@ import subprocess
 import time
 import argparse
 import distutils.spawn
+from collections import defaultdict
 from shapely.geometry import MultiPolygon
 from os import path
 
@@ -40,7 +41,7 @@ class BuildMap(object):
         # Resolve any relative paths with respect to the first config file
         self.base_path = os.path.dirname(os.path.abspath(self.args.config[0]))
         self.temp_dir = self.resolve_path(self.config['output_directory'])
-        self.known_attributes = set()
+        self.known_attributes = defaultdict(set)
         shutil.rmtree(self.temp_dir, True)
         os.makedirs(self.temp_dir)
 
@@ -284,7 +285,8 @@ class BuildMap(object):
             self.generate_tiles(dest_layers)
             self.log.info("Layer IDs: %s",
                           ", ".join(sanitise_layer(layer[1]) for layer in self.get_source_layers()))
-            self.log.info("Known attributes: %s", ", ".join(self.known_attributes))
+            for table, attrs in self.known_attributes.items():
+                self.log.info("Known attributes for %s: %s", table, ", ".join(attrs))
 
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
 
@@ -303,16 +305,16 @@ class BuildMap(object):
         self.log.info("Transforming data...")
         for table in self.config['source_file'].keys():
             self.db.clean_layers(table)
-            self.known_attributes |= self.db.extract_attributes(table)
+            self.known_attributes[table] |= self.db.extract_attributes(table)
 
         self.log.info("Generating map configuration...")
         #  Fetch source layer list from PostGIS
-        source_layers = self.get_source_layers()
+        self.source_layers = self.get_source_layers()
 
         #  For each CartoCSS file (dest layer), generate a .mml file with all source layers
         mml_files = []
         for mss_file in self.get_layer_css():
-            mml_files.append(self.write_mml_file(mss_file, source_layers))
+            mml_files.append(self.write_mml_file(mss_file, self.source_layers))
 
         # Copy marker files to temp dir
         if self.config['symbol_path'] is not None:
