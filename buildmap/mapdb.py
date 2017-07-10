@@ -89,6 +89,12 @@ class MapDB(object):
             # Force geometries to use right-hand rule
             self.conn.execute(text("UPDATE %s SET wkb_geometry = ST_ForceRHR(wkb_geometry)" % table_name))
 
+    def prefix_handles(self, table_name, prefix):
+        """ Prefix entity handles to avoid collisions with multiple DXF files. """
+        with self.conn.begin():
+            self.conn.execute(text("UPDATE %s SET entityhandle = '%s' || entityhandle" %
+                                   (table_name, prefix)))
+
     def get_layers(self, table_name):
         res = self.conn.execute(text("SELECT DISTINCT layer FROM %s" % table_name))
         return [row[0] for row in res]

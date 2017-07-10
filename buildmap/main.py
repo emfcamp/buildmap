@@ -303,8 +303,10 @@ class BuildMap(object):
 
         # Do some data transformation on the PostGIS table
         self.log.info("Transforming data...")
-        for table in self.config['source_file'].keys():
+        for table, tconfig in self.config['source_file'].items():
             self.db.clean_layers(table)
+            if 'handle_prefix' in tconfig:
+                self.db.prefix_handles(table, tconfig['handle_prefix'])
             self.known_attributes[table] |= self.db.extract_attributes(table)
 
         self.log.info("Generating map configuration...")
