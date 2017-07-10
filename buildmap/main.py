@@ -290,12 +290,11 @@ class BuildMap(object):
 
     def build_map(self):
         #  Import each source DXF file into PostGIS
-        try:
-            for table_name, source_file_data in self.config['source_file'].iteritems():
-                self.import_dxf(source_file_data['path'], table_name)
-        except Exception as e:
-            self.log.error(e)
-            return
+        for table_name, source_file_data in self.config['source_file'].iteritems():
+            if 'path' not in source_file_data:
+                self.log.error("No path found for source %s", table_name)
+                return
+            self.import_dxf(source_file_data['path'], table_name)
 
         self.extents = self.get_extents()
         self.log.info("Map extents (N,E,S,W): %s", self.extents)
