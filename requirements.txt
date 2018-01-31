@@ -1,9 +1,0 @@
-#tilestache
-gunicorn
-sqlalchemy
-shapely
-pyyaml
-argparse
-pyhcl
-mapnik
-psycopg2

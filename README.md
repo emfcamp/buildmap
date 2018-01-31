@@ -44,7 +44,7 @@ Web Viewer
 ==========
 
 You will need a website with a javascript map viewer to view the
-generated tiles. Both OpenLayers 3 and Leaflet work for this, however
+generated tiles. Both OpenLayers 3 and Leaflet work well, however
 OpenLayers seems to have better performance for vector layers.
 
 The most up-to-date web interface currently is the [SHA2017 maps
@@ -82,6 +82,8 @@ Example config files can be found in the [config directory](/config).
 Running Buildmap
 ================
 
+Run `pipenv install` to create a virtualenv, and then `pipenv shell` to enter it.
+
 `python ./buildmap.py /path/to/map.conf /path/to/local.conf`
 
 You can optionally pass the `--preseed` command line option, which will cause
@@ -110,6 +112,5 @@ hatches. The following is a limited list of versions:
 Credits
 =======
 
-[Russ Garrett](https://github.com/russss)
-
-This is based on [Redlizard's](https://github.com/redlizard) work for OHM2013.
+* [Russ Garrett](https://github.com/russss) ([Electromagnetic Field](https://www.emfcamp.org))
+* [Redlizard's](https://github.com/redlizard) (OHM2013 and SHA2017)
