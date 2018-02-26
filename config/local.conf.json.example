@@ -1,0 +1,8 @@
+{
+	"db_url": "postgresql://vagrant:buildmap@127.0.0.1/buildmap",
+	"web_directory": "/home/vagrant/map-web",
+        "base_url": "http://localhost:8080",
+	"tile_cache_dir": "/tmp/tilestache",
+	"output_directory": "/tmp/buildmap",
+	"zoom_range": [ 7, 20 ]
+}

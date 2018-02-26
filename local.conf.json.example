@@ -1,7 +1,0 @@
-{
-	"db_url": "postgresql://buildmap:buildmap@127.0.0.1/buildmap",
-	"web_directory": "/var/www/buildmap",
-	"tile_cache_dir": "/var/www/buildmap/tiles",
-	"output_directory": "/tmp/buildmap",
-	"zoom_range": [ 7, 20 ]
-}

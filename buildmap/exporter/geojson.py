@@ -1,27 +1,17 @@
 from __future__ import absolute_import
 import json
-import logging
 import os
 import time
 from sqlalchemy import text
+from . import Exporter
 
 
-class VectorExporter(object):
-    def __init__(self, buildmap, config, db):
-        self.log = logging.getLogger(__name__)
-        self.buildmap = buildmap
-        self.source_tables = dict((table, layer) for layer, table in buildmap.source_layers)
-        self.config = config
-        self.base_path = os.path.dirname(os.path.abspath(__file__))
-        self.db = db
-        self.output_dir = os.path.join(self.config['web_directory'], 'vector')
-
-    def run_query(self, query, **kwargs):
-        return self.db.execute(text(query), **kwargs).fetchall()
-
-    def run(self):
+class GeoJSONExporter(Exporter):
+    def export(self):
         start_time = time.time()
         self.log.info("Exporting vector layers...")
+        self.source_tables = dict((table, layer) for layer, table in self.buildmap.source_layers)
+        self.output_dir = os.path.join(self.config['web_directory'], 'vector')
 
         try:
             os.mkdir(self.output_dir)
@@ -36,6 +26,9 @@ class VectorExporter(object):
         self.generate_layer_index()
 
         self.log.info("Vector layer generation complete in %.2f seconds", time.time() - start_time)
+
+    def run_query(self, query, **kwargs):
+        return self.db.execute(text(query), **kwargs).fetchall()
 
     def source_layers(self, layer):
         result = []

@@ -1,0 +1,411 @@
+{
+	"stylesheet_path": "./styles",
+	"symbol_path": "./symbols",
+	"plugins": [],
+	"extents": [ 52.292, 5.5405, 52.275, 5.5129 ],
+	"zoom_range": [ 7, 20 ],
+	"source_projection": "epsg:28992",
+	
+	"source_file": {
+		"site_plan": {
+			"layers": [
+				"meta ... grid",
+				"meta ... grid ... legend",
+				"meta ... border",
+				"terrain ... farmland",
+				"terrain ... scrubland",
+				"terrain ... woodland",
+				"terrain ... dike",
+				"terrain ... fields ... campground",
+				"terrain ... fields ... labels",
+				"terrain ... water ... ditches and ponds ... bank",
+				"terrain ... water ... ditches and ponds",
+				"terrain ... water ... nuldernauw",
+				"terrain ... water ... nuldernauw ... reed",
+				"terrain ... parking ... field",
+				"terrain ... roads ... gates",
+				"terrain ... roads ... main road",
+				"terrain ... roads ... paved road",
+				"terrain ... roads ... unpaved road",
+				"terrain ... roads ... firelanes",
+				"terrain ... roads ... road plates",
+				"terrain ... roads ... bridges",
+				"terrain ... wharf",
+				"terrain ... wharf ... mooring posts",
+				"terrain ... camper spot",
+				"terrain ... concrete",
+				"terrain ... sand",
+				"terrain ... buildings",
+				"terrain ... fence",
+				"tents ... tarps",
+				"tents ... village tents",
+				"tents ... village tents ... labels",
+				"objects ... tree",
+				"objects ... buildings",
+				"objects ... buildings ... toilet",
+				"objects ... buildings ... utility",
+				"objects ... buildings ... temporary toilet",
+				"infrastructure ... power terminal",
+				"infrastructure ... sewer hole",
+				"infrastructure ... conduit",
+				"meta ... legend",
+				"meta ... restrictions ... early buildup"
+			],
+			"path": "../map/map.dxf",
+			"auto_import_layers": "true",
+			"custom_layer": {
+				"border_line": {
+					"query": "SELECT * FROM {table} WHERE layer = 'meta ... border'"
+				}
+			}
+		},
+		"villages": {
+			"layers": ["terrain ... villages ... borders"],
+			"path": "../map/villages.dxf",
+			"auto_import_layers": "false",
+			"handle_prefix": "vill"
+		},
+		"noc": {
+			"layers": ["team-noc ... cables ... copper",
+				"team-noc ... cables ... fibre-single-mode",
+				"team-noc ... datenklos ... dk-and-label",
+				"team-noc ... datenklos ... radius-40m",
+				"team-noc ... scafftubes",
+				"team-noc ... labels",
+				"team-noc ... switch-in-tent"
+				],
+
+			"path": "../map/noc.dxf",
+			"auto_import_layers": "false",
+			"handle_prefix": "vill"
+		}
+
+
+	},
+	
+	"raster_layer": [
+		{
+			"name": "Base",
+			"stylesheet": "base.mss",
+			"z-index": 0
+		},
+		{
+			"name": "Trees",
+			"stylesheet": "trees.mss",
+			"z-index": 1
+		}
+	],
+	
+	"vector_layer": [
+		{
+			"name": "Grid",
+			"layer_style": {
+				"grid": {
+					"layers": [
+						"meta ... grid",
+						"meta ... grid ... legend"
+					],
+					"line-color": "black",
+					"line-width": 1,
+					"text-color": "black",
+					"selectable": false
+				}
+			},
+			"visible": "false",
+			"z-index": 0
+		},
+		{
+			"name": "Tents and buildings",
+			"layer_style": {
+				"buildings": {
+					"layers": [
+						"objects ... buildings",
+						"objects ... buildings ... temporary toilet",
+						"objects ... buildings ... toilet",
+						"objects ... buildings ... utility"
+					],
+					"line-color": "red",
+					"z-index": 3,
+					"line-width": 2
+				},
+				"generator": {
+					"layers": [
+						"team-power ... generator ... generator",
+						"team-power ... generator ... tank"
+					],
+					"line-color": "orange",
+					"z-index": 3,
+					"line-width": 2
+				},
+				"tents ... tents": {
+					"line-color": "magenta",
+					"z-index": 3,
+					"line-width": 2
+				},
+				"tents ... tarps": {
+					"line-color": "blue",
+					"z-index": 3,
+					"line-width": 2
+				},
+				"objects ... buildings ... container": {
+					"line-color": "#000000",
+					"z-index": 3,
+					"line-width": 2
+				},
+				"objects ... buildings ... portacabin": {
+					"line-color": "#000000",
+					"z-index": 3,
+					"line-width": 2
+				},
+				"objects ... buildings ... radio tower": {
+					"line-color": "#c06000",
+					"z-index": 3,
+					"line-width": 2
+				},
+				"objects ... gate": {
+					"line-color": "#c06000",
+					"z-index": 3,
+					"line-width": 2
+				},
+				"labels": {
+					"layers": [
+						"team-power ... generator ... labels",
+						"tents ... tarps ... labels",
+						"tents ... tents ... labels",
+						"objects ... buildings ... container ... labels",
+						"objects ... buildings ... labels",
+						"objects ... buildings ... portacabin ... labels"
+					],
+					"text-color": "black",
+					"selectable": false
+				}
+			},
+			"z-index": 2
+		},
+		{
+			"name": "Village tents",
+			"visible": "false",
+			"layer_style": {
+				"tents ... village tents": {
+					"line-color": "magenta",
+					"z-index": 3,
+					"line-width": 2
+				},
+				"tents ... village tents ... labels": {
+					"text-color": "black",
+					"selectable": false
+				}
+			},
+			"z-index": 2
+		},
+		{
+			"name": "Field names",
+			"layer_style": {
+				"terrain ... fields ... labels": {
+					"text-color": "black",
+					"selectable": false
+				}
+			},
+			"z-index": 2
+		},
+		{
+			"name": "Campers",
+			"visible": "false",
+			"layer_style": {
+				"terrain ... camper spot": {
+					"line-color": "#800080",
+					"line-width": 2,
+					"z-index": 0
+				}
+			},
+			"z-index": 2
+		},
+		{
+			"name": "Available from early buildup",
+			"visible": "false",
+			"layer_style": {
+				"meta ... restrictions ... early buildup": {
+					"line-color": "yellow",
+					"line-width": 3,
+					"z-index": 0
+				}
+			},
+			"z-index": 1
+		},
+		{
+			"name": "Emergency services route",
+			"visible": "false",
+			"layer_style": {
+				"routes ... R03_calamiteitenroute": {
+					"line-color": "red",
+					"line-width": 5,
+					"selectable": false
+				}
+			},
+			"z-index": 2
+		},
+		{
+			"name": "Evacuation route",
+			"visible": "false",
+			"layer_style": {
+				"safety ... escape route": {
+					"line-color": "darkgreen",
+					"line-width": 3,
+					"selectable": false
+				},
+				"safety ... escape route ... arrow lines": {
+					"polygon-fill": "darkgreen",
+					"selectable": false
+				},
+				"safety ... evacuation point": {
+					"line-color": "darkgreen",
+					"line-width": 1,
+					"selectable": false
+				}
+			},
+			"z-index": 2
+		},
+		{
+			"name": "Team:Logistics",
+			"visible": "false",
+			"layer_style": {
+				"team-logistics ... trash": {
+					"line-color": "black",
+					"line-width": 2
+				},
+				"team-logistics ... trash ... labels": {
+					"text-color": "black",
+					"selectable": false
+				}
+			},
+			"z-index": 2
+		},
+		{ 	"name": "Village Borders",
+			"visible": "false",
+			"layer_style": {
+				"terrain ... villages ... borders": {
+					"line-color": "green",
+					"line-width": 1,
+					"z-index": 3
+				}
+			}
+		},
+		{
+			"name": "Team:NOC",
+			"visible": "false",
+			"layer_style": {
+				"team-noc ... cables ... copper": {
+					"line-color": "black",
+					"line-width": 2,
+					"z-index": 3
+				},
+				"team-noc ... cables ... fibre-single-mode": {
+					"line-color": "green",
+					"line-width": 3,
+					"z-index": 3
+				},
+				"team-noc ... datenklos ... dk-and-label": {
+					"line-color": "cyan",
+					"line-width": 1,
+					"polygon-fill": "cyan",
+					"text-color": "blue",
+					"text-selectable": false,
+					"z-index": 4
+				},
+				"team-noc ... datenklos ... radius-40m": {
+					"polygon-fill": "rgba(120,60,60,0.2)",
+					"z-index": 4,
+					"selectable": false
+				},
+				"team-noc ... scafftubes": {
+					"polygon-fill": "red",
+					"z-index": 4
+				},
+				"team-noc ... labels": {
+					"text-color": "blue",
+					"selectable": false,
+					"z-index": 4
+				},
+				"team-noc ... switch-in-tent": {
+					"line-color": "magenta",
+					"line-width": 1,
+					"polygon-fill": "magenta",
+					"z-index": 4
+				}
+			},
+			"z-index": 3
+		},
+		{
+			"name": "Build-up Power",
+			"visible": "false",
+			"layer_style": {
+				"infrastructure": {
+					"layers": [
+						"infrastructure ... sketch ... power ... aluminium_4x050",
+						"infrastructure ... sketch ... power ... aluminium_4x070",
+						"infrastructure ... sketch ... power ... aluminium_4x095",
+						"infrastructure ... sketch ... power ... aluminium_4x120",
+						"infrastructure ... sketch ... power ... aluminium_4x150"
+					],
+					"line-color": "red",
+					"line-width": 3
+				},
+				"objects ... power terminal": {
+					"polygon-fill": "orange",
+					"line-color": "black",
+					"z-index": 5,
+					"line-width": 5
+				}
+			},
+			"z-index": 2
+		},
+		{
+			"name": "Water -- APPROXIMATE",
+			"visible": "false",
+			"layer_style": {
+				"water": {
+					"layers": [
+						"infrastructure ... sketch ... water ... pe040",
+						"infrastructure ... sketch ... water ... pe063",
+						"infrastructure ... sketch ... water ... pe080",
+						"infrastructure ... sketch ... water ... pe090",
+						"infrastructure ... sketch ... water ... pe110"
+					],
+					"line-color": "blue",
+					"line-width": 3
+				}
+			},
+			"z-index": 2
+		},
+		{
+			"name": "Sewage -- APPROXIMATE",
+			"visible": "false",
+			"layer_style": {
+				"sewage_1": {
+					"layers": [
+						"infrastructure ... sketch ... sewage ... pers_pe090mm",
+						"infrastructure ... sketch ... sewage ... pers_pe160mm"
+					],
+					"line-color": "lightbrown",
+					"line-width": 3
+				},
+				"sewage_2": {
+					"layers": [
+						"infrastructure ... sketch ... sewage ... vrijverval_pvc200",
+						"infrastructure ... sketch ... sewage ... vrijverval_pvc250",
+						"infrastructure ... sketch ... sewage ... vrijverval_pvc315"
+					],
+					"line-color": "brown",
+					"line-width": 3
+				},
+				"objects ... sewer hole": {
+					"polygon-fill": "brown",
+					"line-color": "brown",
+					"z-index": 5,
+					"line-width": 5
+				}
+			},
+			"z-index": 2
+		}
+	]
+}

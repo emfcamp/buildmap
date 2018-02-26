@@ -1,2 +1,0 @@
-#!/bin/bash
-exec chpst -u vagrant gunicorn -w 2 -b 127.0.0.1:8080 "TileStache:WSGITileServer('/home/vagrant/buildmap/output/tilestache.json')" 2>&1
