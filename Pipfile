@@ -12,8 +12,9 @@ Shapely = "*"
 PyYAML = "*"
 argparse = "*"
 pyhcl = "*"
-mapnik = "*"
 "psycopg2" = "*"
+tilestache = "*"
+toml = "*"
 
 [dev-packages]
 

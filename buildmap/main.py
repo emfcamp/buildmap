@@ -14,13 +14,14 @@ from shapely.geometry import MultiPolygon
 from .util import sanitise_layer
 from .exporter.geojson import GeoJSONExporter
 from .exporter.mapnik import MapnikExporter
+from .exporter.tegola import TegolaExporter
 from .static import StaticExporter
 from .mapdb import MapDB
 
 
 class BuildMap(object):
     def __init__(self):
-        self.log = logging.getLogger(__name__)
+        self.log = logging.getLogger(self.__class__.__name__)
         parser = argparse.ArgumentParser(description="Mapping workflow processor")
         parser.add_argument('--preseed', dest='preseed', action='store_true',
                             help="Preseed the tile cache")
@@ -155,6 +156,9 @@ class BuildMap(object):
         if 'raster_layer' in self.config:
             mapnik_exporter = MapnikExporter(self, self.config, self.db)
             exporters.append(mapnik_exporter)
+
+        if 'mapbox_vector_layer' in self.config:
+            exporters.append(TegolaExporter(self, self.config, self.db))
 
         for exporter in exporters:
             exporter.export()

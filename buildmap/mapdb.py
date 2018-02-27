@@ -10,7 +10,7 @@ from sqlalchemy.sql import text
 class MapDB(object):
     """ Wrap common PostGIS operations """
     def __init__(self, url):
-        self.log = logging.getLogger(__name__)
+        self.log = logging.getLogger(self.__class__.__name__)
         self.url = sqlalchemy.engine.url.make_url(url)
 
     def connect(self):
@@ -94,6 +94,13 @@ class MapDB(object):
         with self.conn.begin():
             self.conn.execute(text("UPDATE %s SET entityhandle = '%s' || entityhandle" %
                                    (table_name, prefix)))
+
+    def get_layer_type(self, table_name, layer_name):
+        with self.conn.begin():
+            result = self.conn.execute(text(
+                "SELECT DISTINCT ST_GeometryType(wkb_geometry) FROM %s WHERE layer = '%s'" % (
+                    table_name, layer_name)))
+            return [row[0] for row in result]
 
     def get_layers(self, table_name):
         res = self.conn.execute(text("SELECT DISTINCT layer FROM %s" % table_name))
