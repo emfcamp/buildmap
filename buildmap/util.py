@@ -5,6 +5,7 @@ import re
 def sanitise_layer(name):
     name = re.sub(r'[- (\.\.\.)]+', '_', name.lower())
     name = re.sub(r'[\(\)]', '', name)
+    name = name.strip('_')
     return name
 
 

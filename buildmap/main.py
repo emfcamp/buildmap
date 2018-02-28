@@ -160,6 +160,8 @@ class BuildMap(object):
         if 'mapbox_vector_layer' in self.config:
             exporters.append(TegolaExporter(self, self.config, self.db))
 
+        self.log.info("Exporting with: %s", ",".join(e.__class__.__name__ for e in exporters))
+
         for exporter in exporters:
             exporter.export()
 
