@@ -20,6 +20,11 @@ class MapDB(object):
         except sqlalchemy.exc.OperationalError as e:
             self.log.error("Error connecting to database (%s): %s", self.url, e)
             return False
+
+        if len(self.execute(text("SELECT * FROM pg_extension WHERE extname = 'postgis'")).fetchall()) == 0:
+            self.log.error("Database %s does not have PostGIS installed", self.url)
+            return False
+
         self.log.info("Connected to PostGIS database %s", self.url)
         return True
 
