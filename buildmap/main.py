@@ -5,6 +5,7 @@ import json
 import sys
 import logging
 import os
+import os.errno
 import shutil
 import subprocess
 import time
@@ -41,7 +42,11 @@ class BuildMap(object):
         self.temp_dir = self.resolve_path(self.config['output_directory'])
         self.known_attributes = defaultdict(set)
         shutil.rmtree(self.temp_dir, True)
-        os.makedirs(self.temp_dir)
+        try:
+            os.makedirs(self.temp_dir)
+        except OSError as e:
+            if e.errno != os.errno.EEXIST:
+                raise
 
     def load_config(self, config_files):
         config = {}
