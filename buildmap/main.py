@@ -5,7 +5,6 @@ import json
 import sys
 import logging
 import os
-import os.errno
 import shutil
 import subprocess
 import time
