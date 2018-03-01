@@ -2,6 +2,7 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 
 import json
+import sys
 import logging
 import os
 import shutil
@@ -58,15 +59,19 @@ class BuildMap(object):
             raise Exception("Source DXF file %s does not exist" % dxf)
 
         self.log.info("Importing %s into PostGIS table %s...", dxf, table_name)
-        subprocess.check_call(['ogr2ogr',
-                               '-s_srs', self.config['source_projection'],
-                               '-t_srs', self.config['source_projection'],
-                               '-sql', 'SELECT *, OGR_STYLE FROM entities',
-                               '-nln', table_name,
-                               '-f', 'PostgreSQL',
-                               '-overwrite',
-                               'PG:%s' % self.db.url,
-                               dxf])
+        try:
+            subprocess.check_call(['ogr2ogr',
+                                   '-s_srs', self.config['source_projection'],
+                                   '-t_srs', self.config['source_projection'],
+                                   '-sql', 'SELECT *, OGR_STYLE FROM entities',
+                                   '-nln', table_name,
+                                   '-f', 'PostgreSQL',
+                                   '-overwrite',
+                                   'PG:%s' % self.db.url,
+                                   dxf])
+        except OSError as e:
+            self.log.error("Unable to run ogr2ogr: %s", e)
+            sys.exit(1)
 
     def get_source_layers(self):
         """ Get a list of source layers. Returns a list of (tablename, layername) tuples """
