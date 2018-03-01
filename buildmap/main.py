@@ -12,10 +12,6 @@ from collections import defaultdict
 from shapely.geometry import MultiPolygon
 
 from .util import sanitise_layer
-from .exporter.geojson import GeoJSONExporter
-from .exporter.mapnik import MapnikExporter
-from .exporter.tegola import TegolaExporter
-from .static import StaticExporter
 from .mapdb import MapDB
 
 
@@ -150,14 +146,21 @@ class BuildMap(object):
         mapnik_exporter = None
         exporters = []
 
+        # Exporters are imported on demand here, so that modules required by a
+        # single exporter don't prevent buildmap from running if that exporter is
+        # unused
+
         if 'vector_layer' in self.config:
+            from .exporter.geojson import GeoJSONExporter
             exporters.append(GeoJSONExporter(self, self.config, self.db))
 
         if 'raster_layer' in self.config:
+            from .exporter.mapnik import MapnikExporter
             mapnik_exporter = MapnikExporter(self, self.config, self.db)
             exporters.append(mapnik_exporter)
 
         if 'mapbox_vector_layer' in self.config:
+            from .exporter.tegola import TegolaExporter
             exporters.append(TegolaExporter(self, self.config, self.db))
 
         self.log.info("Exporting with: %s", ",".join(e.__class__.__name__ for e in exporters))
@@ -173,6 +176,7 @@ class BuildMap(object):
             mapnik_exporter.preseed()
 
     def generate_static(self, dest_layers):
+        from .static import StaticExporter
         for layer_name, mapnik_xml in dest_layers.items():
             if layer_name.lower() == self.args.layer.lower():
                 StaticExporter(self.config).export(mapnik_xml, self.args.static)
