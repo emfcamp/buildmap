@@ -9,6 +9,11 @@ from sqlalchemy.sql import text
 
 class MapDB(object):
     """ Wrap common PostGIS operations """
+
+    # Regex to match common embedded DXF text formatting codes. Not exhaustive.
+    # c.f. http://www.cadforum.cz/cadforum_en/text-formatting-codes-in-mtext-objects-tip8640
+    MTEXT_FORMAT_REGEX = r'\\[A-Z]([0-9\.]+;)'
+
     def __init__(self, url):
         self.log = logging.getLogger(self.__class__.__name__)
         self.url = sqlalchemy.engine.url.make_url(url)
@@ -86,6 +91,9 @@ class MapDB(object):
             self.conn.execute(text("UPDATE %s SET text = replace(text, '^J', '\n')" % table_name))
             # Remove "SOLID" labels from fills
             self.conn.execute(text("UPDATE %s SET text = NULL WHERE text = 'SOLID'" % table_name))
+            # Strip formatting codes from text
+            self.conn.execute(text("UPDATE %s SET text = regexp_replace(text, '%s', '')" %
+                                   (table_name, self.MTEXT_FORMAT_REGEX)))
             # Convert closed linestrings to polygons
             self.conn.execute(text("""UPDATE %s SET wkb_geometry = ST_MakePolygon(wkb_geometry)
                                       WHERE ST_IsClosed(wkb_geometry)
