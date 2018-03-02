@@ -73,8 +73,14 @@ class TegolaExporter(Exporter):
 
         m = {
             "name": "buildmap",
+            "bounds": list(reversed(self.buildmap.get_extents())),
+            "center": self.buildmap.get_center() + [float(self.config['zoom_range'][0])],
             "layers": []
         }
+
+        if type(self.config['mapbox_vector_layer']) is dict and \
+                'attribution' in self.config['mapbox_vector_layer']:
+            m['attribution'] = self.config['mapbox_vector_layer']['attribution']
 
         for table_name, layer_name, _ in layers:
             m["layers"].append({
@@ -106,7 +112,7 @@ class TegolaExporter(Exporter):
 
         attrs = ""
         if len(self.buildmap.known_attributes[table_name]) > 0:
-            attrs = "," + ",".join(self.buildmap.known_attributes[table_name])
+            attrs = ", " + ",".join(self.buildmap.known_attributes[table_name])
 
         sql = """SELECT ogc_fid AS gid,
                          ST_AsBinary(ST_Transform(%s, %s)) AS geom,

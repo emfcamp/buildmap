@@ -110,6 +110,11 @@ class BuildMap(object):
             # Bounds here are (minx, miny, maxx, maxy)
             return [bounds[3], bounds[2], bounds[1], bounds[0]]
 
+    def get_center(self):
+        """ Return the center of the map, in WGS84 coordinates (lon, lat) """
+        ext = self.get_extents()
+        return [(ext[1] + ext[3]) / 2, (ext[0] + ext[2]) / 2]
+
     def run(self):
         if not self.db.connect():
             return
