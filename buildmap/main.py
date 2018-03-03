@@ -10,7 +10,7 @@ import subprocess
 import time
 import argparse
 from collections import defaultdict
-from shapely.geometry import MultiPolygon
+from shapely.geometry import MultiPolygon, Polygon
 
 from .util import sanitise_layer
 from .mapdb import MapDB
@@ -35,6 +35,7 @@ class BuildMap(object):
 
         self.config = self.load_config(self.args.config)
         self.db = MapDB(self.config['db_url'])
+        self.bbox = None
 
         # Resolve any relative paths with respect to the first config file
         self.base_path = os.path.dirname(os.path.abspath(self.args.config[0]))
@@ -97,23 +98,30 @@ class BuildMap(object):
                     results.append((table_name, layer))
         return results
 
-    def get_extents(self):
-        """ Return extents of the map, in WGS84 coordinates (north, east, south, west) """
-        if 'extents' in self.config:
-            return self.config['extents']
+    def get_bbox(self):
+        """ Return bounding box of the map, as a shapely Polygon in WGS84 coordinates.
+
+            `bbox.bounds` will return the extents as minx, miny, maxx, maxy
+            (W, S, E, N).
+        """
+        if self.bbox:
+            return self.bbox
+        elif 'extents' in self.config:
+            # Extents config is reversed
+            n, e, s, w = self.config['extents']
+            self.bbox = Polygon([(n, e), (s, e), (s, w), (n, w), (n, e)])
         else:
             # Combine extents of all tables
             bboxes = []
             for table_name in self.config['source_file'].keys():
                 bboxes.append(self.db.get_bounds(table_name))
-            bounds = MultiPolygon(bboxes).bounds
-            # Bounds here are (minx, miny, maxx, maxy)
-            return [bounds[3], bounds[2], bounds[1], bounds[0]]
+            self.bbox = MultiPolygon(bboxes).bounds
+        return self.bbox
 
     def get_center(self):
         """ Return the center of the map, in WGS84 coordinates (lon, lat) """
-        ext = self.get_extents()
-        return [(ext[1] + ext[3]) / 2, (ext[0] + ext[2]) / 2]
+        centroid = self.get_bbox().centroid
+        return list(centroid.coords[0])
 
     def run(self):
         if not self.db.connect():
@@ -145,8 +153,7 @@ class BuildMap(object):
                 return
             self.import_dxf(source_file_data['path'], table_name)
 
-        self.extents = self.get_extents()
-        self.log.info("Map extents (N,E,S,W): %s", self.extents)
+        self.log.info("Map extents (N,E,S,W): %s", list(reversed(self.get_bbox().bounds)))
 
         # Do some data transformation on the PostGIS table
         self.log.info("Transforming data...")
@@ -155,6 +162,8 @@ class BuildMap(object):
             if 'handle_prefix' in tconfig:
                 self.db.prefix_handles(table, tconfig['handle_prefix'])
             self.known_attributes[table] |= self.db.extract_attributes(table)
+
+        self.db.create_bounding_layer("bounding_box", self.get_bbox())
 
         self.log.info("Running exporters...")
         mapnik_exporter = None

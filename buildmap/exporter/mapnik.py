@@ -47,7 +47,7 @@ class MapnikExporter(Exporter):
     def mml_layer(self, query, name):
         """ Generate a layer structure for a MML file"""
         data_source = {
-            'extent': self.buildmap.extents,
+            'extent': list(reversed(self.buildmap.get_bbox().bounds)),
             'table': query,
             'type': 'postgis',
             'dbname': self.db.url.database
@@ -63,7 +63,7 @@ class MapnikExporter(Exporter):
             'name': sanitise_layer(name),
             'id': sanitise_layer(name),
             'srs': "+init=%s" % self.config['source_projection'],
-            'extent': self.buildmap.extents,
+            'extent': list(reversed(self.buildmap.get_bbox().bounds)),
             'Datasource': data_source
         }
         return layer_struct
@@ -119,6 +119,8 @@ class MapnikExporter(Exporter):
             "layers": {},
         }
 
+        w, s, e, n = self.buildmap.get_bbox().bounds
+        center = self.buildmap.get_center()
         for layer_name, xml_file in dest_layers.items():
             tilestache_config['layers'][layer_name] = {
                 "provider": {
@@ -133,14 +135,14 @@ class MapnikExporter(Exporter):
                 "bounds": {
                     "low": self.config['zoom_range'][0],
                     "high": self.config['zoom_range'][1],
-                    "north": self.extents[0],
-                    "east": self.extents[1],
-                    "south": self.extents[2],
-                    "west": self.extents[3]
+                    "north": n,
+                    "east": e,
+                    "south": s,
+                    "west": w
                 },
                 "preview": {
-                    "lat": (self.extents[0] + self.extents[2]) / 2,
-                    "lon": (self.extents[1] + self.extents[3]) / 2,
+                    "lat": center.y,
+                    "lon": center.x,
                     "zoom": self.config['zoom_range'][0],
                     "ext": "png"
                 }
@@ -178,7 +180,7 @@ class MapnikExporter(Exporter):
                                'path': path.splitext(path.basename(layer[1]['stylesheet']))[0],
                                'visible': layer[1].get('visible', "true") == "true"})
 
-        result = {'extents': self.extents,
+        result = {'extents': list(reversed(self.buildmap.get_bbox().bounds)),
                   'base_url': self.config.get('base_url', '/'),
                   'zoom_range': self.config['zoom_range'],
                   'layers': layer_list}
@@ -196,6 +198,7 @@ class MapnikExporter(Exporter):
 
         zoom_levels = [str(l) for l in range(self.config['zoom_range'][0], self.config['zoom_range'][1] + 1)]
         for layer in self.dest_layers:
-            subprocess.call([tilestache_seed, "-x", "-b"] + [str(c) for c in self.extents] +
+            subprocess.call([tilestache_seed, "-x", "-b"] +
+                            [str(c) for c in list(reversed(self.buildmap.get_bbox().bounds))] +
                             ["-c", path.join(self.buildmap.temp_dir, "tilestache.json"), "-l", layer] +
                             zoom_levels)

@@ -39,6 +39,12 @@ class MapDB(object):
             return self.extract_attributes_for_table(table)
 
     def extract_attributes_for_table(self, table_name):
+        """ Extract the DXF's XDATA attributes into individual columns.
+
+            When GDAL imports a DXF into PostGIS, it stuffs all the attributes
+            into the "extendedentity" column. This function attempts to extract
+            them nicely so we can use them.
+        """
         known_attributes = set()
         attributes = defaultdict(list)
         result = self.conn.execute(text("""SELECT ogc_fid, extendedentity FROM %s
@@ -77,12 +83,28 @@ class MapDB(object):
         return known_attributes
 
     def get_bounds(self, table_name, srs=4326):
+        """ Fetch the bounding box of all rows within a table. """
         # Performance note: it's neater to transform coordinates to the target SRS before
         # running ST_Extent, as it doesn't require us knowing what the table SRS is, but
         # this is obviously much slower. It doesn't seem to be an issue so far though.
         res = self.conn.execute(text("SELECT ST_AsEWKT(ST_Extent(ST_Transform(wkb_geometry, %s))) FROM %s"
                                      % (srs, table_name))).first()
         return wkt.loads(res[0])
+
+    def create_bounding_layer(self, table_name, bbox, srid=4326):
+        """ Create a new table containing a single row representing the bounding box
+            of the map. This can be used by renderers to mask off any background layers
+            behind our map.
+
+            `bbox` should be a shapely Polygon
+        """
+        with self.conn.begin():
+            self.conn.execute(text('DROP TABLE IF EXISTS "%s"' % table_name))
+            self.conn.execute(text('CREATE TABLE "%s" (wkb_geometry geometry(POLYGON, %s))' %
+                                   (table_name, srid)))
+            self.conn.execute(text('''INSERT INTO "%s" (wkb_geometry) VALUES (
+                                   ST_SetSRID('%s'::geometry, %s))
+                                   ''' % (table_name, bbox.wkt, srid)))
 
     def clean_layers(self, table_name):
         """ Tidy up some mess in Postgres which ogr2ogr makes when importing DXFs. """

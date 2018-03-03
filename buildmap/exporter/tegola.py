@@ -73,7 +73,7 @@ class TegolaExporter(Exporter):
 
         m = {
             "name": "buildmap",
-            "bounds": list(reversed(self.buildmap.get_extents())),
+            "bounds": self.buildmap.get_bbox().bounds,
             "center": self.buildmap.get_center() + [float(self.config['zoom_range'][0])],
             "layers": []
         }
