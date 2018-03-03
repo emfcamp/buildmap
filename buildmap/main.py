@@ -109,13 +109,13 @@ class BuildMap(object):
         elif 'extents' in self.config:
             # Extents config is reversed
             n, e, s, w = self.config['extents']
-            self.bbox = Polygon([(n, e), (s, e), (s, w), (n, w), (n, e)])
+            self.bbox = Polygon([(e, n), (e, s), (w, s), (w, n), (e, n)])
         else:
             # Combine extents of all tables
             bboxes = []
             for table_name in self.config['source_file'].keys():
                 bboxes.append(self.db.get_bounds(table_name))
-            self.bbox = MultiPolygon(bboxes).bounds
+            self.bbox = MultiPolygon(bboxes)
         return self.bbox
 
     def get_center(self):
@@ -153,7 +153,7 @@ class BuildMap(object):
                 return
             self.import_dxf(source_file_data['path'], table_name)
 
-        self.log.info("Map extents (N,E,S,W): %s", list(reversed(self.get_bbox().bounds)))
+        self.log.info("Map bounds (N, E, S, W): %s", list(reversed(self.get_bbox().bounds)))
 
         # Do some data transformation on the PostGIS table
         self.log.info("Transforming data...")

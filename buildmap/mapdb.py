@@ -100,8 +100,10 @@ class MapDB(object):
         """
         with self.conn.begin():
             self.conn.execute(text('DROP TABLE IF EXISTS "%s"' % table_name))
-            self.conn.execute(text('CREATE TABLE "%s" (wkb_geometry geometry(POLYGON, %s))' %
-                                   (table_name, srid)))
+            self.conn.execute(text('''CREATE TABLE "%s" (
+                                        id SERIAL PRIMARY KEY,
+                                        wkb_geometry geometry(POLYGON, %s))
+                                   ''' % (table_name, srid)))
             self.conn.execute(text('''INSERT INTO "%s" (wkb_geometry) VALUES (
                                    ST_SetSRID('%s'::geometry, %s))
                                    ''' % (table_name, bbox.wkt, srid)))

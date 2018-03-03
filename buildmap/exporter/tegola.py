@@ -73,7 +73,7 @@ class TegolaExporter(Exporter):
 
         m = {
             "name": "buildmap",
-            "bounds": self.buildmap.get_bbox().bounds,
+            "bounds": list(self.buildmap.get_bbox().bounds),
             "center": self.buildmap.get_center() + [float(self.config['zoom_range'][0])],
             "layers": []
         }
@@ -89,6 +89,22 @@ class TegolaExporter(Exporter):
                 "max_zoom": self.config['zoom_range'][1]
             })
 
+        # Add bounding box layer to config
+        provider["layers"].append({
+            "name": "bounding_box",
+            "sql": """SELECT id AS gid, ST_AsBinary(ST_Transform(wkb_geometry, 3857)) AS geom
+                        FROM bounding_box
+                        WHERE ST_Transform(wkb_geometry, 3857) && !BBOX!
+                   """
+        })
+
+        m["layers"].append({
+            "provider_layer": "%s.bounding_box" % (self.PROVIDER_NAME),
+            "min_zoom": self.config['zoom_range'][0],
+            "max_zoom": self.config['zoom_range'][1]
+        })
+
+        # Construct config
         data = {
             "cache": {
                 "type": "file",
