@@ -14,7 +14,7 @@ thread = None
 app = Flask(__name__)
 # app.config['VALIDATE_IP'] = False
 app.config['VALIDATE_SIGNATURE'] = False
-hooks = Hooks(app, url='/hooks/')
+hooks = Hooks(app, url='/')
 
 
 def regenerate_worker():
