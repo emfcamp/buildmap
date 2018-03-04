@@ -15,7 +15,7 @@ class TegolaExporter(Exporter):
 
     PROVIDER_NAME = "buildmap"
     # Tegola only supports Web Mercator (3857) and WGS84 (4326), so we
-    # need to transform explicitly
+    # need to transform from our working CRS, which is not likely to be one of those.
     SRID = 3857
 
     def export(self):
@@ -24,6 +24,12 @@ class TegolaExporter(Exporter):
             toml.dump(self.generate_tegola_config(), fp)
 
     def get_layers(self):
+        """ Generate `(tablename, layername, sql)` for each layer we want to render.
+
+            MVT/Tegola only supports layers with a single geometry type, whereas DXF will
+            happily let you have layers with multiple types. We try and output a layer per
+            geometry type in this case, but this may not be possible.
+        """
         source = self.buildmap.get_source_layers()
         for table_name, layer_name in source:
             types = self.db.get_layer_type(table_name, layer_name)
@@ -32,10 +38,10 @@ class TegolaExporter(Exporter):
                 # This layer only contains GeometryCollections.
                 # Let's assume they're LineStrings.
                 yield (table_name, layer_name,
-                       self.get_layer_sql(table_name, layer_name, collection_type=2))
+                       self.get_layer_sql(table_name, layer_name, 'ST_LineString', True))
             elif len(types) == 1:
                 # A single simple type. This is the easy case.
-                yield (table_name, layer_name, self.get_layer_sql(table_name, layer_name))
+                yield (table_name, layer_name, self.get_layer_sql(table_name, layer_name, types[0]))
             elif 'ST_GeometryCollection' in types:
                 # No idea what to do here yet, bail
                 self.log.warn("Skipping layer '%s/%s' because it has multiple geometry types, "
@@ -47,7 +53,7 @@ class TegolaExporter(Exporter):
                 for typ in types:
                     type_alias = typ.lower().split('_')[1]
                     yield (table_name, layer_name + '_' + type_alias,
-                           self.get_layer_sql(table_name, layer_name, type_filter=typ))
+                           self.get_layer_sql(table_name, layer_name, typ))
 
     def generate_tegola_config(self):
         provider = {
@@ -115,20 +121,35 @@ class TegolaExporter(Exporter):
         }
         return data
 
-    def get_layer_sql(self, table_name, layer_name, collection_type=None, type_filter=None):
-        """ collection_type is:
-                1 - Point
-                2 - Linestring
-                3 - Polygon
+    def get_layer_sql(self, table_name, layer_name, geometry_type, transform_collections=False):
+        """ Generate the SQL for this layer.
+
+            `geometry_type` is the PostGIS geometry type (e.g. 'ST_LineString')
+
+            If `transform_collections` is True, we'll extract entities of the specified
+            type from any ST_GeometryCollections (which are generated from DXF blocks).
         """
-        field = 'wkb_geometry'
+        geom_field = 'wkb_geometry'
 
-        if collection_type:
-            field = 'ST_CollectionExtract(%s, %s)' % (field, collection_type)
+        if transform_collections:
+            # ST_CollectionExtract requires these magic numbers:
+            type_map = {'ST_Point': 1, 'ST_LineString': 2, 'ST_Polygon': 3}
+            geom_field = 'ST_CollectionExtract(%s, %s)' % (geom_field, type_map[geometry_type])
 
-        attrs = ""
+        additional_fields = []
         if len(self.buildmap.known_attributes[table_name]) > 0:
-            attrs = ", " + ",".join(self.buildmap.known_attributes[table_name])
+            additional_fields += self.buildmap.known_attributes[table_name]
+
+        # Add derived fields based on geometry type
+        if geometry_type == 'ST_LineString':
+            additional_fields.append('round(ST_Length(%s), 2) AS length' % geom_field)
+        elif geometry_type == 'ST_Polygon':
+            additional_fields.append('round(ST_Perimeter(%s), 2) AS perimeter' % geom_field)
+            additional_fields.append('round(ST_Area(%s), 2) AS area' % geom_field)
+
+        fields_txt = ""
+        if len(additional_fields) > 0:
+            fields_txt = ", " + ", ".join(additional_fields)
 
         sql = """SELECT ogc_fid AS gid,
                          ST_AsBinary(ST_Transform(%s, %s)) AS geom,
@@ -138,9 +159,9 @@ class TegolaExporter(Exporter):
                   FROM %s
                   WHERE layer = '%s'
                   AND ST_Transform(wkb_geometry, %s) && !BBOX! """ % (
-            field, self.SRID, attrs, table_name, layer_name, self.SRID)
+            geom_field, self.SRID, fields_txt, table_name, layer_name, self.SRID)
 
-        if type_filter:
-            sql += "AND ST_GeometryType(wkb_geometry) = '%s'" % type_filter
+        if geometry_type and not transform_collections:
+            sql += "AND ST_GeometryType(wkb_geometry) = '%s'" % geometry_type
 
         return sql
