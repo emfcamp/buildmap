@@ -6,7 +6,6 @@ import threading
 import subprocess
 from flask import Flask
 from flask.ext.hookserver import Hooks
-import config
 
 script_location = os.path.dirname(os.path.abspath(__file__))
 
@@ -18,9 +17,8 @@ hooks = Hooks(app, url='/')
 
 
 def regenerate_worker():
-    for filename in config.source_files.values():
-        os.chdir('/home/russ/gis')
-        subprocess.check_call(['git', 'pull'])
+    os.chdir('/home/russ/gis')
+    subprocess.check_call(['git', 'pull'])
     os.chdir(script_location)
     subprocess.check_call(['python', './buildmap.py', '../gis/map.json', './local.conf.json'])
     os.chdir("/home/russ/docker/buildmap")
