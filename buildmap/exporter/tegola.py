@@ -142,10 +142,10 @@ class TegolaExporter(Exporter):
 
         # Add derived fields based on geometry type
         if geometry_type == 'ST_LineString':
-            additional_fields.append('round(ST_Length(%s), 2) AS length' % geom_field)
+            additional_fields.append('round(ST_Length(%s) AS numeric, 2) AS length' % geom_field)
         elif geometry_type == 'ST_Polygon':
-            additional_fields.append('round(ST_Perimeter(%s), 2) AS perimeter' % geom_field)
-            additional_fields.append('round(ST_Area(%s), 2) AS area' % geom_field)
+            additional_fields.append('round(ST_Perimeter(%s) AS numeric, 2) AS perimeter' % geom_field)
+            additional_fields.append('round(ST_Area(%s) AS numeric, 2) AS area' % geom_field)
 
         fields_txt = ""
         if len(additional_fields) > 0:
