@@ -14,9 +14,9 @@ class MapDB(object):
         you can't use them for table names, and the entire database is throwaway.
     """
 
-    # Regex to match common embedded DXF text formatting codes. Not exhaustive.
+    # Regex to match common embedded DXF text formatting codes. Probably not exhaustive.
     # c.f. http://www.cadforum.cz/cadforum_en/text-formatting-codes-in-mtext-objects-tip8640
-    MTEXT_FORMAT_REGEX = r'\\[A-Z]([0-9\.]+;)'
+    MTEXT_FORMAT_REGEX = r'(\\[A-Za-z]([A-Za-z0-9\.\|]+;))*'
 
     def __init__(self, url):
         self.log = logging.getLogger(self.__class__.__name__)
