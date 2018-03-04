@@ -1,4 +1,5 @@
 # coding=utf-8
+"""An example github webhook server to update the map. This will need tweaking for your needs. """
 from __future__ import division, absolute_import, print_function, unicode_literals
 import os
 import threading
@@ -18,13 +19,13 @@ hooks = Hooks(app, url='/hooks/')
 
 def regenerate_worker():
     for filename in config.source_files.values():
-        os.chdir(os.path.abspath(os.path.dirname(os.path.join(script_location, filename))))
+        os.chdir('/home/russ/gis')
         subprocess.check_call(['git', 'pull'])
     os.chdir(script_location)
-    subprocess.check_call(['python', './buildmap.py'])
-    subprocess.check_call(['sudo', 'sv', 'stop', 'tilestache'])
-    subprocess.check_call(['rm', '-Rf', '/tmp/stache/*'])
-    subprocess.check_call(['sudo', 'sv', 'start', 'tilestache'])
+    subprocess.check_call(['python', './buildmap.py', '../gis/map.json', './local.conf.json'])
+    os.chdir("/home/russ/docker/buildmap")
+    subprocess.check_call(['sudo', 'docker-compose', 'down'])
+    subprocess.check_call(['sudo', 'docker-compose', 'up', '-d'])
 
 
 @hooks.hook('ping')
