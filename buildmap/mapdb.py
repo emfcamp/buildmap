@@ -8,7 +8,11 @@ from sqlalchemy.sql import text
 
 
 class MapDB(object):
-    """ Wrap common PostGIS operations """
+    """ Wrap common PostGIS operations.
+
+        Before you get all annoyed about me not using bind variables here,
+        you can't use them for table names, and the entire database is throwaway.
+    """
 
     # Regex to match common embedded DXF text formatting codes. Not exhaustive.
     # c.f. http://www.cadforum.cz/cadforum_en/text-formatting-codes-in-mtext-objects-tip8640
@@ -125,6 +129,10 @@ class MapDB(object):
                                       AND ST_NumPoints(wkb_geometry) > 3""" % table_name))
             # Force geometries to use right-hand rule
             self.conn.execute(text("UPDATE %s SET wkb_geometry = ST_ForceRHR(wkb_geometry)" % table_name))
+            # Drop the "subclasses" column which contains the original DXF geometry type.
+            # This could be misleading after the above transformations, and using
+            # ST_GeometryType is better practice anyway.
+            self.conn.execute(text("ALTER TABLE %s DROP COLUMN subclasses" % table_name))
 
     def prefix_handles(self, table_name, prefix):
         """ Prefix entity handles to avoid collisions with multiple DXF files. """
