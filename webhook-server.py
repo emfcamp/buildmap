@@ -40,3 +40,6 @@ def push(data, guid):
         thread = threading.Thread(name='worker', target=regenerate_worker)
         thread.start()
     return 'OK'
+
+
+app.run()
