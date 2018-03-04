@@ -11,7 +11,7 @@ script_location = os.path.dirname(os.path.abspath(__file__))
 
 thread = None
 app = Flask(__name__)
-# app.config['VALIDATE_IP'] = False
+app.config['VALIDATE_IP'] = False
 app.config['VALIDATE_SIGNATURE'] = False
 hooks = Hooks(app, url='/')
 
