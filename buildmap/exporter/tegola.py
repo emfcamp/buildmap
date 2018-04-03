@@ -42,6 +42,12 @@ class TegolaExporter(Exporter):
             elif len(types) == 1:
                 # A single simple type. This is the easy case.
                 yield (table_name, layer_name, self.get_layer_sql(table_name, layer_name, types[0]))
+            elif 'ST_GeometryCollection' in types and len(types) == 2:
+                # This contains both collection and non-collection types.
+                # Extract the non-collection type from the collection types.
+                types.remove('ST_GeometryCollection')
+                yield (table_name, layer_name,
+                       self.get_layer_sql(table_name, layer_name, types[0], True))
             elif 'ST_GeometryCollection' in types:
                 # No idea what to do here yet, bail
                 self.log.warn("Skipping layer '%s/%s' because it has multiple geometry types, "
