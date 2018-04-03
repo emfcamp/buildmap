@@ -44,10 +44,9 @@ class TegolaExporter(Exporter):
                 yield (table_name, layer_name, self.get_layer_sql(table_name, layer_name, types[0]))
             elif 'ST_GeometryCollection' in types and len(types) == 2:
                 # This contains both collection and non-collection types.
-                # Extract the non-collection type from the collection types.
-                types.remove('ST_GeometryCollection')
+                # Let's just assume LineString - I think tegola is not so keen on multipolygons either?
                 yield (table_name, layer_name,
-                       self.get_layer_sql(table_name, layer_name, types[0], True))
+                       self.get_layer_sql(table_name, layer_name, 'ST_LineString', True))
             elif 'ST_GeometryCollection' in types:
                 # No idea what to do here yet, bail
                 self.log.warn("Skipping layer '%s/%s' because it has multiple geometry types, "
