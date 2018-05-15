@@ -193,8 +193,12 @@ class BuildMap(object):
             exporter.export()
 
         for plugin, opts in self.config.get('plugins', {}).items():
-            self.log.info("Running plugin %s...", plugin)
-            pluginmod = importlib.import_module('.' + plugin, 'buildmap.plugins')
+            try:
+                pluginmod = importlib.import_module('.' + plugin, 'buildmap.plugins')
+                self.log.info("Running plugin %s...", plugin)
+            except ImportError:
+                self.log.warn("Plugin %s not found", plugin)
+                continue
             plugincls = getattr(pluginmod, plugin.capitalize() + 'Plugin')
             plugincls(self, self.config, opts, self.db).run()
 
