@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import time
 import argparse
+import importlib
 from collections import defaultdict
 from shapely.geometry import MultiPolygon, Polygon
 
@@ -191,9 +192,11 @@ class BuildMap(object):
         for exporter in exporters:
             exporter.export()
 
-        for plugin in self.config.get('plugins', []):
-            self.log.info("Running plugin %s...", plugin.__name__)
-            plugin(self, self.config, self.db).run()
+        for plugin, opts in self.config.get('plugins', {}).items():
+            self.log.info("Running plugin %s...", plugin)
+            pluginmod = importlib.import_module('.' + plugin, 'buildmap.plugins')
+            plugincls = getattr(pluginmod, plugin.capitalize() + 'Plugin')
+            plugincls(self, self.config, opts, self.db).run()
 
         if self.args.preseed and mapnik_exporter is not None:
             mapnik_exporter.preseed()
