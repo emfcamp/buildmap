@@ -13,9 +13,10 @@ Vagrant.configure(2) do |config|
   config.vm.network "forwarded_port", guest: 8080, host: 8080
   config.vm.network "private_network", type: "dhcp"
 
-  config.vm.synced_folder ".", "/home/vagrant/buildmap", type: "nfs"
-  config.vm.synced_folder "../gis", "/home/vagrant/gis", type: "nfs"
-  config.vm.synced_folder "../map-web", "/home/vagrant/map-web", type: "nfs"
+  config.vm.synced_folder ".", "/home/vagrant/buildmap", type: "nfs", mount_options: ['actimeo=2']
+  config.vm.synced_folder "../gis", "/home/vagrant/gis", type: "nfs", mount_options: ['actimeo=2']
+  config.vm.synced_folder "../map-web", "/home/vagrant/map-web", type: "nfs", mount_options: ['actimeo=2']
+  config.vm.synced_folder "../powerplan", "/home/vagrant/powerplan", type: "nfs", mount_options: ['actimeo=2']
 
   config.vm.provision "shell", inline: <<-SHELL
      export BUILDMAP=/home/vagrant/buildmap

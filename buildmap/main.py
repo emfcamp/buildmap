@@ -15,6 +15,7 @@ from shapely.geometry import MultiPolygon, Polygon
 
 from .util import sanitise_layer
 from .mapdb import MapDB
+from . import plugins  # noqa
 
 
 class BuildMap(object):
@@ -148,7 +149,7 @@ class BuildMap(object):
 
     def build_map(self):
         #  Import each source DXF file into PostGIS
-        for table_name, source_file_data in self.config['source_file'].iteritems():
+        for table_name, source_file_data in self.config['source_file'].items():
             if 'path' not in source_file_data:
                 self.log.error("No path found for source %s", table_name)
                 return
@@ -196,8 +197,8 @@ class BuildMap(object):
             try:
                 pluginmod = importlib.import_module('.' + plugin, 'buildmap.plugins')
                 self.log.info("Running plugin %s...", plugin)
-            except ImportError:
-                self.log.warn("Plugin %s not found", plugin)
+            except ImportError as e:
+                self.log.exception("Plugin %s not loaded: %s", plugin, e)
                 continue
             plugincls = getattr(pluginmod, plugin.capitalize() + 'Plugin')
             plugincls(self, self.config, opts, self.db).run()

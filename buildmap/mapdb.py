@@ -80,7 +80,7 @@ class MapDB(object):
         for attr_name in known_attributes:
             self.conn.execute(text("ALTER TABLE %s ADD COLUMN %s TEXT" % (table_name, attr_name)))
 
-        for ogc_fid, attrs in attributes.iteritems():
+        for ogc_fid, attrs in attributes.items():
             for name, value in attrs:
                 self.conn.execute(text("UPDATE %s SET %s = :value WHERE ogc_fid = :fid" %
                                   (table_name, name.lower())), value=value, fid=ogc_fid)
@@ -133,6 +133,8 @@ class MapDB(object):
             # This could be misleading after the above transformations, and using
             # ST_GeometryType is better practice anyway.
             self.conn.execute(text("ALTER TABLE %s DROP COLUMN subclasses" % table_name))
+            # Create layer index to speed up querying
+            self.conn.execute(text("CREATE INDEX %s_layer on %s(layer)" % (table_name, table_name)))
 
     def prefix_handles(self, table_name, prefix):
         """ Prefix entity handles to avoid collisions with multiple DXF files. """
@@ -151,5 +153,5 @@ class MapDB(object):
         res = self.conn.execute(text("SELECT DISTINCT layer FROM %s" % table_name))
         return [row[0] for row in res]
 
-    def execute(self, query, **kwargs):
-        return self.conn.execute(query, **kwargs)
+    def execute(self, query, *args, **kwargs):
+        return self.conn.execute(query, *args, **kwargs)

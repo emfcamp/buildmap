@@ -1,11 +1,9 @@
 [[source]]
-
 url = "https://pypi.python.org/simple"
 verify_ssl = true
 name = "pypi"
 
 [packages]
-
 gunicorn = "*"
 SQLAlchemy = "*"
 Shapely = "*"
@@ -15,6 +13,6 @@ pyhcl = "*"
 "psycopg2" = "*"
 tilestache = "*"
 toml = "*"
+"8fd4d6f" = {path = "./../powerplan"}
 
 [dev-packages]
-
