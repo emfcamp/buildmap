@@ -28,7 +28,7 @@ Vagrant.configure(2) do |config|
      echo "-------------------- Install packages"
      echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
      sudo apt-get install -q -y nginx postgis gdal-bin vim ttf-mscorefonts-installer python-dev
-     sudo apt-get install -q -y python-mapnik python-psycopg2 python-pip python-gdal python-cairocffi
+     sudo apt-get install -q -y python-mapnik python-psycopg2 python-pip python-gdal python-cairocffi unzip
      sudo pip install pipenv
      cd $BUILDMAP; sudo pipenv install --system
      echo "-------------------- Nginx config"
@@ -42,19 +42,7 @@ Vagrant.configure(2) do |config|
      sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/9.5/main/postgresql.conf
      sudo sed -i 's|^local|local buildmap all trust\\nhost all all 0.0.0.0/0  trust\\nlocal|' /etc/postgresql/9.5/main/pg_hba.conf
      service postgresql restart
-     echo "-------------------- Install magnacarto"
-     cd /tmp
-     export MAGNACARTO_TAR=magnacarto-$MAGNACARTO_VER-linux-amd64.tar.gz
-     wget --progress=bar:force https://download.omniscale.de/magnacarto/rel/$MAGNACARTO_VER/$MAGNACARTO_TAR
-     tar zxf $MAGNACARTO_TAR
-     sudo cp magnacarto-$MAGNACARTO_VER-linux-amd64/magnacarto /usr/bin
-     rm -f $MAGNACARTO_TAR
-     echo "-------------------- Set up systemd for tilestache"
-     sudo cp $BUILDMAP/etc/tilestache.service /etc/systemd/system/
-     sudo systemctl daemon-reload
-     sudo systemctl enable tilestache
-     sudo systemctl start tilestache
-     echo "-------------------- Done"
+
 SHELL
 
 end
