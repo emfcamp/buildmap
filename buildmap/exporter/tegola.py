@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import toml
+import re
 from os import path
 from ..util import sanitise_layer
 from . import Exporter
@@ -9,8 +10,9 @@ class TegolaExporter(Exporter):
     """ Generate config for Tegola, which is a Mapbox Vector Tiles server.
 
         There are some "impedance mismatches" here - mostly due to the fact that
-        a MVT layer can only have a single geometry type, and must not be a
-        GeometryCollection (which is what DXF blocks become).
+        a MVT layer can only have a single geometry type (I believe this is a Mapbox
+        GL requirement rather than a format restriction), and does not support
+        GeometryCollections (which is what DXF blocks become).
     """
 
     PROVIDER_NAME = "buildmap"
@@ -27,32 +29,16 @@ class TegolaExporter(Exporter):
         """ Generate `(tablename, layername, sql)` for each layer we want to render.
 
             MVT/Tegola only supports layers with a single geometry type, whereas DXF will
-            happily let you have layers with multiple types. We try and output a layer per
-            geometry type in this case, but this may not be possible.
+            happily let you have layers with multiple types. We output a layer per
+            geometry type in this case.
         """
         source = self.buildmap.get_source_layers()
         for table_name, layer_name in source:
+            # the get_layer_type function will return all the component types of a GeometryCollection.
+            # We can handle those in get_layer_sql
             types = self.db.get_layer_type(table_name, layer_name)
-
-            if types == ['ST_GeometryCollection']:
-                # This layer only contains GeometryCollections.
-                # Let's assume they're LineStrings.
-                yield (table_name, layer_name,
-                       self.get_layer_sql(table_name, layer_name, 'ST_LineString', True))
-            elif len(types) == 1:
-                # A single simple type. This is the easy case.
+            if len(types) == 1:
                 yield (table_name, layer_name, self.get_layer_sql(table_name, layer_name, types[0]))
-            elif 'ST_GeometryCollection' in types and len(types) == 2:
-                # This contains both collection and non-collection types.
-                # Let's just assume LineString - I think tegola is not so keen on multipolygons either?
-                yield (table_name, layer_name,
-                       self.get_layer_sql(table_name, layer_name, 'ST_LineString', True))
-            elif 'ST_GeometryCollection' in types:
-                # No idea what to do here yet, bail
-                self.log.warn("Skipping layer '%s/%s' because it has multiple geometry types, "
-                              "including GeometryCollection (%s)",
-                              table_name, layer_name, ", ".join(types))
-                continue
             else:
                 # Multiple simple types. Split them into different layers.
                 for typ in types:
@@ -126,47 +112,66 @@ class TegolaExporter(Exporter):
         }
         return data
 
-    def get_layer_sql(self, table_name, layer_name, geometry_type, transform_collections=False):
+    def get_layer_sql(self, table_name, layer_name, geometry_type):
         """ Generate the SQL for this layer.
 
-            `geometry_type` is the PostGIS geometry type (e.g. 'ST_LineString')
+            `geometry_type` is the PostGIS geometry type we want to extract
+            (e.g. 'ST_LineString')
 
-            If `transform_collections` is True, we'll extract entities of the specified
-            type from any ST_GeometryCollections (which are generated from DXF blocks).
+            We'll extract entities of the specified type from any ST_GeometryCollections
+            (which are generated from DXF blocks).
         """
         geom_field = 'wkb_geometry'
+        fid_field = 'ogc_fid'
+        additional_fields = ['text', 'entityhandle'] + list(self.buildmap.known_attributes[table_name])
 
-        if transform_collections:
-            # ST_CollectionExtract requires these magic numbers:
-            type_map = {'ST_Point': 1, 'ST_LineString': 2, 'ST_Polygon': 3}
-            geom_field = 'ST_CollectionExtract(%s, %s)' % (geom_field, type_map[geometry_type])
+        type_map = {'ST_Point': 1, 'ST_LineString': 2, 'ST_Polygon': 3}
 
-        additional_fields = []
-        if len(self.buildmap.known_attributes[table_name]) > 0:
-            additional_fields += self.buildmap.known_attributes[table_name]
+        # Return all table entries, plus the contents of all GeometryCollections.
+        query = "(SELECT {fields} FROM {table}".format(
+            fields=", ".join([geom_field, fid_field, "layer"] + additional_fields),
+            table=table_name)
+        query += " UNION ALL "
+        # It would be nicer to use ST_Dump here, but we can't simply split each GeometryCollection
+        # into its component parts because MVT requires unique IDs, and we'll lose the connection between
+        # map objects and DXF objects. ST_CollectionExtract will return MultiGeometries (which MVT does
+        # support).
+        query += """SELECT ST_CollectionExtract({geom_field}, {geom_type}) AS {geom_field},
+                    {fields} FROM {table}
+                    WHERE ST_GeometryType({geom_field}) = 'ST_GeometryCollection'""".format(
+            geom_field=geom_field, geom_type=type_map[geometry_type],
+            fields=", ".join([fid_field, "layer"] + additional_fields),
+            table=table_name
+        )
+        query += ") AS t"
+        table_name = query
 
         # Add derived fields based on geometry type
         if geometry_type == 'ST_LineString':
-            additional_fields.append('round(ST_Length(%s)::numeric, 2) AS length' % geom_field)
+            additional_fields.append('round(ST_Length(%s)::numeric, 1) AS length' % geom_field)
         elif geometry_type == 'ST_Polygon':
-            additional_fields.append('round(ST_Perimeter(%s)::numeric, 2) AS perimeter' % geom_field)
-            additional_fields.append('round(ST_Area(%s)::numeric, 2) AS area' % geom_field)
+            additional_fields.append('round(ST_Perimeter(%s)::numeric, 1) AS perimeter' % geom_field)
+            additional_fields.append('round(ST_Area(%s)::numeric, 1) AS area' % geom_field)
 
-        fields_txt = ""
-        if len(additional_fields) > 0:
-            fields_txt = ", " + ", ".join(additional_fields)
-
-        sql = """SELECT ogc_fid AS gid,
+        sql = """SELECT %s AS gid,
                          ST_AsBinary(ST_Transform(%s, %s)) AS geom,
-                         text,
-                         entityhandle
                          %s
                   FROM %s
                   WHERE layer = '%s'
                   AND ST_Transform(wkb_geometry, %s) && !BBOX! """ % (
-            geom_field, self.SRID, fields_txt, table_name, layer_name, self.SRID)
+            fid_field, geom_field, self.SRID, ", ".join(additional_fields), table_name, layer_name, self.SRID)
 
-        if geometry_type and not transform_collections:
-            sql += "AND ST_GeometryType(wkb_geometry) = '%s'" % geometry_type
+        # Filter the result by the type of geometry we're looking for, taking into account MultiGeometries.
+        type_synonyms = {
+            'ST_LineString': ['ST_Line', 'ST_LineString', 'ST_MultiLineString'],
+            'ST_Polygon': ['ST_Polygon', 'ST_MultiPolygon'],
+            'ST_Point': ['ST_Point', 'ST_MultiPoint']
+        }
+
+        sql += "AND ST_GeometryType(wkb_geometry) IN (" + \
+            " ,".join("'" + t + "'" for t in type_synonyms[geometry_type]) + ")"
+
+        # Tidy up the SQL string so it's more readable in the tegola config
+        sql = re.sub(r'\s+', ' ', sql)
 
         return sql

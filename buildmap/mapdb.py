@@ -144,9 +144,18 @@ class MapDB(object):
 
     def get_layer_type(self, table_name, layer_name):
         with self.conn.begin():
-            result = self.conn.execute(text(
-                "SELECT DISTINCT ST_GeometryType(wkb_geometry) FROM %s WHERE layer = '%s'" % (
-                    table_name, layer_name)))
+            sql = """SELECT DISTINCT ST_GeometryType(geom) FROM (
+                        SELECT (ST_Dump(wkb_geometry)).geom AS geom
+                            FROM {table} WHERE layer = '{layer}'
+                            and st_geometrytype(wkb_geometry) = 'ST_GeometryCollection'
+                        UNION ALL SELECT wkb_geometry AS geom
+                            FROM {table} WHERE layer = '{layer}'
+                            AND st_geometrytype(wkb_geometry) != 'ST_GeometryCollection'
+                    ) AS t""".format(
+                        table=table_name,
+                        layer=layer_name
+                    )
+            result = self.conn.execute(text(sql))
             return [row[0] for row in result]
 
     def get_layers(self, table_name):
