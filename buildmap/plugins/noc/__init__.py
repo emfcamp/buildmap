@@ -3,9 +3,10 @@ import time
 from collections import namedtuple
 from pprint import pprint
 
+import csv
 from sqlalchemy.sql import text
 
-Switch = namedtuple('Switch', ['fid', 'name'])
+Switch = namedtuple('Switch', ['name'])
 Connection = namedtuple('Connection', ['from_switch', 'to_switch', 'type', 'length', 'cores'])
 
 
@@ -50,7 +51,7 @@ class NocPlugin(object):
                                    layer=self.switch_layer):
             if 'switch' not in row or row['switch'] is None:
                 self.log.warning("Switch name not found in entity 0x%s on %s layer" % (row['entityhandle'], self.switch_layer))
-            yield Switch(row['ogc_fid'], row['switch'])
+            yield Switch(row['switch'])
 
     def find_switch_from_connection(self, edge_entityhandle, edge_layer, edge_ogc_fid, start_or_end):
         node_sql = text("""SELECT switch.switch AS switch
@@ -104,12 +105,9 @@ class NocPlugin(object):
 
         for switch in self.get_switches():
             self.switches[switch.name] = switch
-        pprint(self.switches)
 
         for connection in self.get_connections():
             self.connections.append(connection)
-
-        pprint(self.connections)
 
         # Start from UPLINK
 
@@ -135,6 +133,18 @@ class NocPlugin(object):
         self.create_index()
         plan = self.generate_plan()
         self.log.info("Plan generated in %.2f seconds", time.time() - start)
+
+        with open('noc-switches.csv', 'w') as switches_file:
+            writer = csv.writer(switches_file)
+            writer.writerow(['Switch-Name'])
+            for switch in sorted(self.switches.values()):
+                writer.writerow(switch)
+
+        with open('noc-links.csv', 'w') as links_file:
+            writer = csv.writer(links_file)
+            writer.writerow(['From-Switch', 'To-Switch', 'Type', 'Length', 'Cores'])
+            for connection in self.connections:
+                writer.writerow(connection)
 
         # dot = to_dot(plan)
         # with open('plan.pdf', 'wb') as f:
