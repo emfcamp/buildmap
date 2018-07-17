@@ -11,6 +11,7 @@ Connection = namedtuple('Connection', ['from_switch', 'to_switch', 'type', 'leng
 
 class NocPlugin(object):
     BUFFER = 1
+    UPDOWN_LENGTH = 6  # How many metres to add per and up-and-down a festoon pole
 
     def __init__(self, _buildmap, _config, opts, db):
         self.log = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class NocPlugin(object):
         sql = text("""SELECT layer,
                             round(ST_Length(wkb_geometry)::NUMERIC, 1) AS length,
                             cores,
+                            updowns,
                             entityhandle,
                             ogc_fid
                         FROM site_plan
@@ -90,7 +92,13 @@ class NocPlugin(object):
 
             # self.log.info("Link from %s to %s" % (from_switch, to_switch))
 
-            yield from_switch, to_switch, row['layer'], row['length'], row['cores']
+            type = self.connection_layers[row['layer']]
+            total_length = row['length']
+            if row['updowns'] is not None:
+                total_length += int(row['updowns']) * self.UPDOWN_LENGTH
+            cores = row['cores']
+
+            yield from_switch, to_switch, type, total_length, cores
 
     def generate_plan(self):
 
