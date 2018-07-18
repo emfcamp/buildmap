@@ -26,8 +26,8 @@ class NocPlugin(object):
     COLOUR_COPPER = 'slateblue4'
     COLOUR_FIBRE = 'goldenrod'
     LENGTH_COPPER_NOT_CCA = 30
-    LENGTH_COPPER_CRITICAL = 90
     LENGTH_COPPER_WARNING = 70
+    LENGTH_COPPER_CRITICAL = 90
 
     def __init__(self, _buildmap, _config, opts, db):
         self.log = logging.getLogger(__name__)
@@ -131,14 +131,6 @@ class NocPlugin(object):
 
         return True
 
-    def create_index(self):
-        # Extremely specific geo index time
-        # does this conflict with the power index?
-        sql = text("""CREATE INDEX IF NOT EXISTS site_plan_geometry_buffer
-                        ON site_plan USING GIST(ST_Buffer(wkb_geometry, :buf))
-                        WHERE layer = :switch_layer""")
-        self.db.execute(sql, buf=self.BUFFER, switch_layer=self.switch_layer)
-
     def order_links_from_switch(self, switch_name):
         if switch_name in self.processed_switches:
             self.log.warning("Switch %s has an infinite loop of connections!" % switch_name)
@@ -182,6 +174,8 @@ class NocPlugin(object):
         sg.add_node(node)
 
     def create_dot(self):
+        self.log.info("Generating graph")
+
         dot = pydot.Dot("NOC", graph_type='digraph', strict=True)
         dot.set_node_defaults(shape='none', fontsize=14, margin=0, fontname='Arial')
         dot.set_edge_defaults(fontsize=13, fontname='Arial')
@@ -264,7 +258,6 @@ class NocPlugin(object):
                       self.switch_layer, list(self.connection_layers.keys()))
 
         start = time.time()
-        self.create_index()
         if not self.generate_plan():
             return
         self.log.info("Plan generated in %.2f seconds", time.time() - start)
