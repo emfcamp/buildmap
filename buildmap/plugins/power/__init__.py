@@ -2,7 +2,9 @@ import logging
 import time
 import re
 import powerplan
+import os.path
 from powerplan.diagram import to_dot
+from powerplan.bom import generate_bom_html
 from collections import namedtuple
 from sqlalchemy.sql import text
 
@@ -20,10 +22,11 @@ def get_key(row, name):
 class PowerPlugin(object):
     BUFFER = 1
 
-    def __init__(self, _buildmap, _config, opts, db):
+    def __init__(self, buildmap, _config, opts, db):
         self.log = logging.getLogger(__name__)
         self.db = db
         self.opts = opts
+        self.buildmap = buildmap
         self.generator_layer = None
         self.distro_layer = None
         self.connection_layers = {}
@@ -179,5 +182,17 @@ class PowerPlugin(object):
         self.log.info("Plan validated in %.2f seconds", time.time() - start)
 
         dot = to_dot(plan)
-        with open('plan.pdf', 'wb') as f:
+
+        out_path = self.buildmap.resolve_path(self.buildmap.config['output_directory'])
+        with open(os.path.join(out_path, 'power-plan.pdf'), 'wb') as f:
             f.write(dot.create_pdf())
+
+        # for grid in plan.grids():
+        #    dot = to_dot(grid)
+        #    with open(os.path.join(out_path, 'power-plan-%s.pdf' % grid.name), 'wb') as f:
+        #        f.write(dot.create_pdf())
+
+        with open(os.path.join(out_path, 'power-bom.html'), 'w') as f:
+            f.write(generate_bom_html(plan))
+
+        self.log.info("Power plans output to %s", out_path)
