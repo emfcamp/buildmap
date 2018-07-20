@@ -183,7 +183,11 @@ class PowerPlugin(object):
 
         dot = to_dot(plan)
 
-        out_path = self.buildmap.resolve_path(self.buildmap.config['output_directory'])
+        out_path = os.path.join(
+            self.buildmap.resolve_path(self.buildmap.config['web_directory']),
+            "power"
+        )
+        os.makedirs(out_path)
         with open(os.path.join(out_path, 'power-plan.pdf'), 'wb') as f:
             f.write(dot.create_pdf())
 
