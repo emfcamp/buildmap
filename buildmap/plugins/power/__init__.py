@@ -187,7 +187,12 @@ class PowerPlugin(object):
             self.buildmap.resolve_path(self.buildmap.config['web_directory']),
             "power"
         )
-        os.makedirs(out_path)
+
+        try:
+            os.makedirs(out_path)
+        except FileExistsError:
+            pass
+
         with open(os.path.join(out_path, 'power-plan.pdf'), 'wb') as f:
             f.write(dot.create_pdf())
 
