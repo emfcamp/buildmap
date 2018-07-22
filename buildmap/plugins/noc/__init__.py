@@ -1,6 +1,7 @@
 import logging
 import time
 from collections import namedtuple
+import os.path
 
 import pydotplus as pydot  # type: ignore
 import csv
@@ -29,10 +30,11 @@ class NocPlugin(object):
     LENGTH_COPPER_WARNING = 70
     LENGTH_COPPER_CRITICAL = 90
 
-    def __init__(self, _buildmap, _config, opts, db):
+    def __init__(self, buildmap, _config, opts, db):
         self.log = logging.getLogger(__name__)
         self.db = db
         self.opts = opts
+        self.buildmap = buildmap
         self.switch_layer = None
         self.connection_layers = {}
 
@@ -244,7 +246,7 @@ class NocPlugin(object):
         sg.set_labeljust('l')
         dot.add_subgraph(sg)
 
-        title = pydot.Node('title', shape='none', label=self._title_label("Electromagnetic Field 2018"))
+        title = pydot.Node('title', shape='none', label=self._title_label(self.opts.get('name')))
         title.set_pos('0,0!')
         title.set_fontsize(18)
         dot.add_node(title)
@@ -262,13 +264,23 @@ class NocPlugin(object):
             return
         self.log.info("Plan generated in %.2f seconds", time.time() - start)
 
-        with open('noc-switches.csv', 'w') as switches_file:
+        out_path = os.path.join(
+            self.buildmap.resolve_path(self.buildmap.config['web_directory']),
+            "noc"
+        )
+
+        try:
+            os.makedirs(out_path)
+        except FileExistsError:
+            pass
+
+        with open(os.path.join(out_path, 'switches.csv'), 'w') as switches_file:
             writer = csv.writer(switches_file)
             writer.writerow(['Switch-Name'])
             for switch in sorted(self.switches.values()):
                 writer.writerow(switch)
 
-        with open('noc-links.csv', 'w') as links_file:
+        with open(os.path.join(out_path, 'links.csv'), 'w') as links_file:
             writer = csv.writer(links_file)
             writer.writerow(['From-Switch', 'To-Switch', 'Type', 'Length', 'Cores'])
             for connection in self.connections:
@@ -277,5 +289,5 @@ class NocPlugin(object):
         dot = self.create_dot()
         if not dot:
             return
-        with open('noc-physical.pdf', 'wb') as f:
+        with open(os.path.join(out_path, 'noc-physical.pdf'), 'wb') as f:
             f.write(dot.create_pdf())
