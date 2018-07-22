@@ -2,7 +2,6 @@ import logging
 import time
 from collections import namedtuple
 import os.path
-
 import pydotplus as pydot  # type: ignore
 import csv
 from sqlalchemy.sql import text
@@ -60,7 +59,7 @@ class NocPlugin(object):
         if self.switch_layer and len(self.link_layers) > 0:
             return True
         else:
-            self.log.warn("Unable to locate all required NOC layers. Layers discovered: %s", layers)
+            self.log.warning("Unable to locate all required NOC layers. Layers discovered: %s", layers)
             return False
 
     def get_switches(self):
@@ -115,24 +114,12 @@ class NocPlugin(object):
             total_length = row['length']
             if row['updowns'] is not None:
                 total_length += int(row['updowns']) * self.UPDOWN_LENGTH
-            cores = row['cores']
+            cores = int(row['cores']) if row['cores'] else None
+            if type == 'fibre' and cores is None:
+                self.log.warning("Fibre link from %s to %s had no cores, assuming 1" % (from_switch, to_switch))
+                cores = 1
 
             yield Link(from_switch, to_switch, type, total_length, cores)
-
-    def generate_plan(self):
-        for switch in self.get_switches():
-            self.switches[switch.name] = switch
-
-        for link in self.get_links():
-            self.links.append(link)
-
-        # Order links so that they go away from the core
-        root = self.switches[self.opts.get('core')]
-        self.processed_switches = set()
-        self.processed_links = set()
-        self.order_links_from_switch(root.name)
-
-        return True
 
     def order_links_from_switch(self, switch_name):
         if switch_name in self.processed_switches:
@@ -152,6 +139,37 @@ class NocPlugin(object):
             if link.from_switch == switch_name:
                 self.processed_links.add(link)  # Mark it as being correctly ordered
                 self.order_links_from_switch(link.to_switch)
+
+    def _validate_child_link_cores(self, switch_name):
+        cores = 1  # One for the local fibre-served switch
+        for link in self.links:
+            if link.type == 'fibre' and link.from_switch == switch_name:
+                child_switch_cores = self._validate_child_link_cores(link.to_switch)
+                if link.cores != child_switch_cores:
+                    self.log.warning("Link from %s to %s requires %d cores but has %d" % (switch_name, link.to_switch, child_switch_cores, link.cores))
+                cores += child_switch_cores
+
+        return cores
+
+    def generate_plan(self):
+        for switch in self.get_switches():
+            self.switches[switch.name] = switch
+
+        for link in self.get_links():
+            self.links.append(link)
+
+        # Order links so that they go away from the core
+        root = self.switches[self.opts.get('core')]
+        self.processed_switches = set()
+        self.processed_links = set()
+        self.order_links_from_switch(root.name)
+
+        # Validate that all fibre links have sufficient cores for all downstream links
+        # Each incoming fibre to a switch should have (1+sum(child_fibre_links.cores))
+
+        self._validate_child_link_cores(root.name)
+
+        return True
 
     def _title_label(self, name):
         label = '<<table border="0" cellspacing="0" cellborder="1" cellpadding="5">'
