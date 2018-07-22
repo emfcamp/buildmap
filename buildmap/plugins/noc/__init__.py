@@ -11,7 +11,7 @@ from datetime import date
 Switch = namedtuple('Switch', ['name'])
 
 
-class Connection:
+class Link:
     def __init__(self, from_switch, to_switch, type, length, cores):
         self.from_switch = from_switch
         self.to_switch = to_switch
@@ -36,11 +36,11 @@ class NocPlugin(object):
         self.opts = opts
         self.buildmap = buildmap
         self.switch_layer = None
-        self.connection_layers = {}
+        self.link_layers = {}
 
         self.switches = {}
-        self.connections = []
-        self.processed_connections = set()
+        self.links = []
+        self.processed_links = set()
         self.processed_switches = set()
 
     def generate_layers_config(self):
@@ -55,10 +55,9 @@ class NocPlugin(object):
             if name_sub.lower() == "switch":
                 self.switch_layer = layer[0]
             elif name_sub.lower() in ['copper', 'fibre']:
-                # conn = Connection(layer[0])
-                self.connection_layers[layer[0]] = name_sub.lower()
+                self.link_layers[layer[0]] = name_sub.lower()
 
-        if self.switch_layer and len(self.connection_layers) > 0:
+        if self.switch_layer and len(self.link_layers) > 0:
             return True
         else:
             self.log.warn("Unable to locate all required NOC layers. Layers discovered: %s", layers)
@@ -72,7 +71,7 @@ class NocPlugin(object):
                 self.log.warning("Switch name not found in entity 0x%s on %s layer" % (row['entityhandle'], self.switch_layer))
             yield Switch(row['switch'])
 
-    def find_switch_from_connection(self, edge_entityhandle, edge_layer, edge_ogc_fid, start_or_end):
+    def _find_switch_from_link(self, edge_entityhandle, edge_layer, edge_ogc_fid, start_or_end):
         node_sql = text("""SELECT switch.switch AS switch
                             FROM site_plan AS edge, site_plan AS switch
                             WHERE edge.ogc_fid=:edge_ogc_fid
@@ -82,17 +81,17 @@ class NocPlugin(object):
         switch_result = self.db.execute(node_sql, edge_ogc_fid=edge_ogc_fid, switch_layers=[self.switch_layer], buf=self.BUFFER)
         switch_rows = switch_result.fetchall()
         if len(switch_rows) < 1:
-            self.log.warning("Connection 0x%s on %s layer does not %s at a switch" % (edge_entityhandle, edge_layer, start_or_end))
+            self.log.warning("Link 0x%s on %s layer does not %s at a switch" % (edge_entityhandle, edge_layer, start_or_end))
             return None
         elif len(switch_rows) > 1:
-            self.log.warning("Connection 0x%s on %s layer %ss at multiple switches" % (edge_entityhandle, edge_layer, start_or_end))
+            self.log.warning("Link 0x%s on %s layer %ss at multiple switches" % (edge_entityhandle, edge_layer, start_or_end))
             return None
         switch = switch_rows[0]['switch']
         return switch
 
-    def get_connections(self):
-        """ Returns all the connections """
-        self.log.info("Loading connections")
+    def get_links(self):
+        """ Returns all the links """
+        self.log.info("Loading links")
 
         sql = text("""SELECT layer,
                             round(ST_Length(wkb_geometry)::NUMERIC, 1) AS length,
@@ -101,56 +100,58 @@ class NocPlugin(object):
                             entityhandle,
                             ogc_fid
                         FROM site_plan
-                        WHERE layer = ANY(:connection_layers) 
+                        WHERE layer = ANY(:link_layers) 
                         AND ST_GeometryType(wkb_geometry) = 'ST_LineString'
                     """)
-        for row in self.db.execute(sql, connection_layers=list(self.connection_layers.keys())):
-            from_switch = self.find_switch_from_connection(row['entityhandle'], row['layer'], row['ogc_fid'], 'start')
-            to_switch = self.find_switch_from_connection(row['entityhandle'], row['layer'], row['ogc_fid'], 'end')
+        for row in self.db.execute(sql, link_layers=list(self.link_layers.keys())):
+            from_switch = self._find_switch_from_link(row['entityhandle'], row['layer'], row['ogc_fid'], 'start')
+            to_switch = self._find_switch_from_link(row['entityhandle'], row['layer'], row['ogc_fid'], 'end')
             if not from_switch or not to_switch:
                 continue
 
             # self.log.info("Link from %s to %s" % (from_switch, to_switch))
 
-            type = self.connection_layers[row['layer']]
+            type = self.link_layers[row['layer']]
             total_length = row['length']
             if row['updowns'] is not None:
                 total_length += int(row['updowns']) * self.UPDOWN_LENGTH
             cores = row['cores']
 
-            yield Connection(from_switch, to_switch, type, total_length, cores)
+            yield Link(from_switch, to_switch, type, total_length, cores)
 
     def generate_plan(self):
         for switch in self.get_switches():
             self.switches[switch.name] = switch
 
-        for connection in self.get_connections():
-            self.connections.append(connection)
+        for link in self.get_links():
+            self.links.append(link)
 
-        # Start from UPLINK
-
-        # complain about switches with no links
+        # Order links so that they go away from the core
+        root = self.switches[self.opts.get('core')]
+        self.processed_switches = set()
+        self.processed_links = set()
+        self.order_links_from_switch(root.name)
 
         return True
 
     def order_links_from_switch(self, switch_name):
         if switch_name in self.processed_switches:
-            self.log.warning("Switch %s has an infinite loop of connections!" % switch_name)
+            self.log.warning("Switch %s has an infinite loop of links!" % switch_name)
             return
 
         self.processed_switches.add(switch_name)
 
-        # find connections that have us as their *to_switch* and swap them if they haven't already been swapped by a parent
-        for connection in self.connections:
-            if connection.to_switch == switch_name:
-                if connection not in self.processed_connections:
-                    connection.to_switch, connection.from_switch = connection.from_switch, connection.to_switch
+        # find links that have us as their *to_switch* and swap them if they haven't already been swapped by a parent
+        for link in self.links:
+            if link.to_switch == switch_name:
+                if link not in self.processed_links:
+                    link.to_switch, link.from_switch = link.from_switch, link.to_switch
 
         # Now repeat for any switch we're connected to
-        for connection in self.connections:
-            if connection.from_switch == switch_name:
-                self.processed_connections.add(connection)  # Mark it as being correctly ordered
-                self.order_links_from_switch(connection.to_switch)
+        for link in self.links:
+            if link.from_switch == switch_name:
+                self.processed_links.add(link)  # Mark it as being correctly ordered
+                self.order_links_from_switch(link.to_switch)
 
     def _title_label(self, name):
         label = '<<table border="0" cellspacing="0" cellborder="1" cellpadding="5">'
@@ -171,9 +172,35 @@ class NocPlugin(object):
         label += '<tr><td port="input"></td></tr></table>>'
         return label
 
-    def dot_add_switch(self, sg, switch):
-        node = pydot.Node(switch.name, label=self._switch_label(switch))
-        sg.add_node(node)
+    def _link_label_and_colour(self, link):
+        open = ''
+        close = ''
+        label = '<'
+        if link.type == 'fibre':
+            label += '{} cores'.format(link.cores)
+            colour = self.COLOUR_FIBRE
+        elif link.type == 'copper':
+            length = float(link.length)
+            if link.cores and int(link.cores) > 1:
+                label += '<b>{}x</b> '.format(link.cores)
+
+            label += self.get_link_medium(link)
+
+            colour = self.COLOUR_COPPER
+            if length > self.LENGTH_COPPER_CRITICAL:
+                open += '<font color="red">'
+                close = '</font>' + close
+            elif length > self.LENGTH_COPPER_WARNING:
+                open += '<font color="orange">'
+                close = '</font>' + close
+        else:
+            self.log.error("Invalid type %s for link between %s and %s", link.type, link.from_switch, link.to_switch)
+            return None, None
+
+        label += '<br/>' + open
+        label += '{}m'.format(str(link.length))
+        label += close + '>'
+        return colour, label
 
     def create_dot(self):
         self.log.info("Generating graph")
@@ -191,49 +218,16 @@ class NocPlugin(object):
 
         sg = pydot.Cluster('physical', label='Physical')
 
-        # Find our root switch
-        root = self.switches['ESNORE']
-        self.processed_switches = set()
-        self.processed_connections = set()
-        self.order_links_from_switch(root.name)
-
         for switch in self.switches.values():
-            self.dot_add_switch(sg, switch)
+            node = pydot.Node(switch.name, label=self._switch_label(switch))
+            sg.add_node(node)
 
-        for connection in self.connections:
-            edge = pydot.Edge(connection.from_switch, connection.to_switch)
+        for link in self.links:
+            edge = pydot.Edge(link.from_switch, link.to_switch)
 
-            open = ''
-            close = ''
-
-            label = '<'
-            if connection.type == 'fibre':
-                label += '{} cores'.format(connection.cores)
-                colour = self.COLOUR_FIBRE
-            elif connection.type == 'copper':
-                length = float(connection.length)
-                if connection.cores and int(connection.cores) > 1:
-                    label += '<b>{}x</b> '.format(connection.cores)
-
-                if length > self.LENGTH_COPPER_NOT_CCA:
-                    label += "Copper"
-                else:
-                    label += "CCA"
-
-                colour = self.COLOUR_COPPER
-                if length > self.LENGTH_COPPER_CRITICAL:
-                    open += '<font color="red">'
-                    close = '</font>' + close
-                elif length > self.LENGTH_COPPER_WARNING:
-                    open += '<font color="orange">'
-                    close = '</font>' + close
-            else:
-                self.log.error("Invalid type %s for connection between %s and %s", connection.type, connection.from_switch, connection.to_switch)
+            colour, label = self._link_label_and_colour(link)
+            if label is None:
                 return None
-
-            label += '<br/>' + open
-            label += '{}m'.format(str(connection.length))
-            label += close + '>'
 
             # edge.set_tailport('{}-{}'.format(edgedata['current'], edgedata['phases']))
             edge.set_headport('input')
@@ -253,11 +247,18 @@ class NocPlugin(object):
 
         return dot
 
+    def get_link_medium(self, link):
+        if link.type == 'copper':
+            length = float(link.length)
+            if length <= self.LENGTH_COPPER_NOT_CCA:
+                return "CCA"
+        return link.type.title()
+
     def run(self):
         if not self.generate_layers_config():
             return
-        self.log.info("NOC layers detected. Switches: '%s', Connections: %s",
-                      self.switch_layer, list(self.connection_layers.keys()))
+        self.log.info("NOC layers detected. Switches: '%s', Links: %s",
+                      self.switch_layer, list(self.link_layers.keys()))
 
         start = time.time()
         if not self.generate_plan():
@@ -269,10 +270,8 @@ class NocPlugin(object):
             "noc"
         )
 
-        try:
+        if not os.path.isdir(out_path):
             os.makedirs(out_path)
-        except FileExistsError:
-            pass
 
         with open(os.path.join(out_path, 'switches.csv'), 'w') as switches_file:
             writer = csv.writer(switches_file)
@@ -282,9 +281,10 @@ class NocPlugin(object):
 
         with open(os.path.join(out_path, 'links.csv'), 'w') as links_file:
             writer = csv.writer(links_file)
-            writer.writerow(['From-Switch', 'To-Switch', 'Type', 'Length', 'Cores'])
-            for connection in self.connections:
-                writer.writerow([connection.from_switch, connection.to_switch, connection.type, connection.length, connection.cores])
+            writer.writerow(['From-Switch', 'To-Switch', 'Type', 'Subtype', 'Length', 'Cores'])
+            for link in self.links:
+                writer.writerow([link.from_switch, link.to_switch, link.type, self.get_link_medium(link),
+                                 link.length, link.cores])
 
         dot = self.create_dot()
         if not dot:
