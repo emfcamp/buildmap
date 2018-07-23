@@ -114,9 +114,11 @@ class NocPlugin(object):
             total_length = row['length']
             if row['updowns'] is not None:
                 total_length += int(row['updowns']) * self.UPDOWN_LENGTH
-            cores = int(row['cores']) if row['cores'] else None
-            if type == 'fibre' and cores is None:
-                self.log.warning("Fibre link from %s to %s had no cores, assuming 1" % (from_switch, to_switch))
+
+            if row['cores']:
+                cores = int(row['cores'])
+            else:
+                self.log.warning("%s link from %s to %s had no cores, assuming 1" % (type.title(), from_switch, to_switch))
                 cores = 1
 
             yield Link(from_switch, to_switch, type, total_length, cores)
