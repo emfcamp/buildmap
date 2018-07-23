@@ -36,11 +36,11 @@ class NocPlugin(object):
         self.buildmap = buildmap
         self.switch_layer = None
         self.link_layers = {}
-
         self.switches = {}
         self.links = []
         self.processed_links = set()
         self.processed_switches = set()
+        self.warnings = []
 
     def generate_layers_config(self):
         " Detect NOC layers in map. "
@@ -59,15 +59,19 @@ class NocPlugin(object):
         if self.switch_layer and len(self.link_layers) > 0:
             return True
         else:
-            self.log.warning("Unable to locate all required NOC layers. Layers discovered: %s", layers)
+            self.log.error("Unable to locate all required NOC layers. Layers discovered: %s" % layers)
             return False
+
+    def _warning(self, msg):
+        self.log.warning(msg)
+        self.warnings.append(msg)
 
     def get_switches(self):
         self.log.info("Loading switches")
         for row in self.db.execute(text("SELECT * FROM site_plan WHERE layer = :layer"),
                                    layer=self.switch_layer):
             if 'switch' not in row or row['switch'] is None:
-                self.log.warning("Switch name not found in entity 0x%s on %s layer" % (row['entityhandle'], self.switch_layer))
+                self._warning("Switch name not found in entity 0x%s on %s layer" % (row['entityhandle'], self.switch_layer))
             yield Switch(row['switch'])
 
     def _find_switch_from_link(self, edge_entityhandle, edge_layer, edge_ogc_fid, start_or_end):
@@ -80,10 +84,10 @@ class NocPlugin(object):
         switch_result = self.db.execute(node_sql, edge_ogc_fid=edge_ogc_fid, switch_layers=[self.switch_layer], buf=self.BUFFER)
         switch_rows = switch_result.fetchall()
         if len(switch_rows) < 1:
-            self.log.warning("Link 0x%s on %s layer does not %s at a switch" % (edge_entityhandle, edge_layer, start_or_end))
+            self._warning("Link 0x%s on %s layer does not %s at a switch" % (edge_entityhandle, edge_layer, start_or_end))
             return None
         elif len(switch_rows) > 1:
-            self.log.warning("Link 0x%s on %s layer %ss at multiple switches" % (edge_entityhandle, edge_layer, start_or_end))
+            self._warning("Link 0x%s on %s layer %ss at multiple switches" % (edge_entityhandle, edge_layer, start_or_end))
             return None
         switch = switch_rows[0]['switch']
         return switch
@@ -118,14 +122,14 @@ class NocPlugin(object):
             if row['cores']:
                 cores = int(row['cores'])
             else:
-                self.log.warning("%s link from %s to %s had no cores, assuming 1" % (type.title(), from_switch, to_switch))
+                self._warning("%s link from %s to %s had no cores, assuming 1" % (type.title(), from_switch, to_switch))
                 cores = 1
 
             yield Link(from_switch, to_switch, type, total_length, cores)
 
     def order_links_from_switch(self, switch_name):
         if switch_name in self.processed_switches:
-            self.log.warning("Switch %s has an infinite loop of links!" % switch_name)
+            self._warning("Switch %s has an infinite loop of links!" % switch_name)
             return
 
         self.processed_switches.add(switch_name)
@@ -148,7 +152,7 @@ class NocPlugin(object):
             if link.type == 'fibre' and link.from_switch == switch_name:
                 child_switch_cores = self._validate_child_link_cores(link.to_switch)
                 if link.cores != child_switch_cores:
-                    self.log.warning("Link from %s to %s requires %d cores but has %d" % (switch_name, link.to_switch, child_switch_cores, link.cores))
+                    self._warning("Link from %s to %s requires %d cores but has %d" % (switch_name, link.to_switch, child_switch_cores, link.cores))
                 cores += child_switch_cores
 
         return cores
@@ -305,6 +309,9 @@ class NocPlugin(object):
             for link in self.links:
                 writer.writerow([link.from_switch, link.to_switch, link.type, self.get_link_medium(link),
                                  link.length, link.cores])
+
+        with open(os.path.join(out_path, 'warnings.txt'), 'w') as warnings_file:
+            warnings_file.writelines("\n".join(self.warnings))
 
         dot = self.create_dot()
         if not dot:
