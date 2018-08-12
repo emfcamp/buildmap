@@ -401,6 +401,41 @@ class NocPlugin(object):
                 return "CCA"
         return link.type.title()
 
+    def _write_stats(self, stats_file):
+        # Physical links
+        copper_count = fibre_count = fibre_cores = 0
+        copper_length = fibre_length = fibre_core_length = 0
+        for link in self.links:
+            if link.type == 'fibre':
+                fibre_count += 1
+                fibre_length += link.length
+                fibre_cores += link.cores
+                fibre_core_length += (link.length * link.cores)
+            elif link.type == 'copper':
+                copper_count += link.cores
+                copper_length += link.length
+        stats_file.write("Number of physical links: %d\n" % (len(self.links)))
+        stats_file.write("- Fibre: %d (Total %sm, %d total cores, total strand length %sm)\n" %
+                         (fibre_count, str(fibre_length), fibre_cores, fibre_core_length))
+        stats_file.write("- Copper: %d (Total %sm)\n" % (copper_count, str(copper_length)))
+
+        # Logical links
+        copper_count = fibre_count = 0
+        copper_length = fibre_length = 0
+        couplers = 0
+        for logical_link in self.logical_links:
+            if logical_link.type == 'fibre':
+                fibre_count += 1
+                fibre_length += logical_link.total_length
+                couplers += logical_link.couplers
+            elif logical_link.type == 'copper':
+                copper_count += 1
+                copper_length += logical_link.total_length
+        stats_file.write("Number of logical links: %d\n" % (len(self.logical_links)))
+        stats_file.write("- Fibre: %d (Total %sm)\n" % (fibre_count, str(fibre_length)))
+        stats_file.write("- Copper: %d (Total %sm)\n" % (copper_count, str(copper_length)))
+        stats_file.write("- Fibre couplers: %d\n" % (couplers))
+
     def run(self):
         if not self.generate_layers_config():
             return
@@ -449,11 +484,7 @@ class NocPlugin(object):
 
         # stats.txt
         with open(os.path.join(out_path, 'stats.txt'), 'w') as stats_file:
-            couplers = 0
-            for logical_link in self.logical_links:
-                if logical_link.type == 'fibre':
-                    couplers += logical_link.couplers
-            stats_file.write("Fibre couplers: %d\n" % (couplers))
+            self._write_stats(stats_file)
 
         # noc-physical.pdf
         physical_dot = self.create_physical_dot()
