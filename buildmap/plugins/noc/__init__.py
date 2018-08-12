@@ -256,11 +256,12 @@ class NocPlugin(object):
         " Label format for a switch. Using graphviz's HTML table support "
 
         label = '<<table border="0" cellborder="1" cellspacing="0" cellpadding="4" color="grey30">\n'
-        label += '''<tr><td bgcolor="{colour}"><font point-size="16"><b>{name}</b></font></td>
+        label += '''<tr><td bgcolor="{colour}" colspan="2"><font point-size="16"><b>{name}</b></font></td>
                         </tr>'''.format(
-            name=switch.name, type='No type assigned', colour=self.COLOUR_HEADER)
+            name=switch.name, colour=self.COLOUR_HEADER)
         # <!--td bgcolor="{colour}"><font point-size="16">{type}</font></td-->
-        label += '<tr><td port="input"></td></tr></table>>'
+        # label += '<tr><td port="input"></td><td port="output"></td></tr>'
+        label += '</table>>'
         return label
 
     def _physical_link_label_and_colour(self, link):
@@ -332,7 +333,7 @@ class NocPlugin(object):
         dot.set_rankdir('LR')
         dot.set_fontname('Arial')
         dot.set_nodesep(0.3)
-        # dot.set_splines('line')
+        dot.set_splines('spline')
 
         sg = pydot.Cluster()  # 'physical', label='Physical')
         # sg.set_color('gray80')
@@ -362,8 +363,8 @@ class NocPlugin(object):
             if label is None:
                 return None
 
-            # edge.set_tailport('{}-{}'.format(edgedata['current'], edgedata['phases']))
-            edge.set_headport('input')
+            # edge.set_headport('input') # not sure why head and tail are the wrong way around
+            # edge.set_tailport('output')
             edge.set_label(label)
             edge.set_color(colour)
             sg.add_edge(edge)
@@ -385,8 +386,8 @@ class NocPlugin(object):
             if label is None:
                 return None
 
-            # edge.set_tailport('{}-{}'.format(edgedata['current'], edgedata['phases']))
-            edge.set_headport('input')
+            # edge.set_headport('input') # not sure why head and tail are the wrong way around
+            # edge.set_tailport('output')
             edge.set_label(label)
             edge.set_color(colour)
             sg.add_edge(edge)
