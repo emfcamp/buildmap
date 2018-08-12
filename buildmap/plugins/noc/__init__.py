@@ -172,7 +172,7 @@ class NocPlugin(object):
         # Physical links have already been ordered by this point so that "from_switch" is the core end.
         for link in self.links:
             if link.to_switch == switch_name:
-                print("Uplink from %s is to %s" % (switch_name, link.from_switch))
+                # print("Uplink from %s is to %s" % (switch_name, link.from_switch))
 
                 # If we're extending:
                 if logical_link.type is not None:
@@ -182,7 +182,8 @@ class NocPlugin(object):
 
                     # We can't extend to a different medium
                     if link.type != logical_link.type:
-                        print("Can't extend %s onto %s" % (logical_link.type, link.type))
+                        self.log.info("Can't extend %s uplink from %s onto %s link from %s back to %s" %
+                                      (logical_link.type, logical_link.to_switch, link.type, link.to_switch, link.from_switch))
                         return
 
                 # Extend to this switch
@@ -190,18 +191,14 @@ class NocPlugin(object):
                 logical_link.type = link.type
                 logical_link.total_length += link.length
                 logical_link.couplers += 1
-                print("Extend back from %s to %s, type %s, length now %d with %d couplers" %
-                      (logical_link.to_switch, link.from_switch, logical_link.type, logical_link.total_length, logical_link.couplers))
+                # print("Extend back from %s to %s, type %s, length now %d with %d couplers" %
+                #       (logical_link.to_switch, link.from_switch, logical_link.type, logical_link.total_length, logical_link.couplers))
 
                 # If it's fibre, we can try to continue extending
                 if logical_link.type == 'fibre':
                     self._make_logical_link(link.from_switch, logical_link)
-                else:
-                    print("Don't try to continue %s" % logical_link.type)
 
                 return
-
-        print("No uplink found from %s" % switch_name)
 
     def generate_plan(self):
         for switch in self.get_switches():
@@ -211,15 +208,15 @@ class NocPlugin(object):
             self.links.append(link)
 
         # Order links so that they go away from the core
-        root = self.switches[self.opts.get('core')]
+        root_switch = self.switches[self.opts.get('core')]
         self.processed_switches = set()
         self.processed_links = set()
-        self.order_links_from_switch(root.name)
+        self.order_links_from_switch(root_switch.name)
 
         # Validate that all fibre links have sufficient cores for all downstream links
         # Each incoming fibre to a switch should have (1+sum(child_fibre_links.cores))
 
-        self._validate_child_link_cores(root.name)
+        self._validate_child_link_cores(root_switch.name)
 
         # Create the logical links
         # We assume that any switch that is fibre in and fibre out is simply patched through with a coupler,
@@ -236,9 +233,14 @@ class NocPlugin(object):
         # (b) If incoming is fibre, a single logical link to the highest parent that is either core or doesn't itself have incoming fibre
 
         for switch_name in self.switches:
-            logical_link = LogicalLink(None, switch_name, None, 0, -1)
-            self._make_logical_link(switch_name, logical_link)
-            self.logical_links.append(logical_link)
+            if switch_name != root_switch.name:
+                logical_link = LogicalLink(None, switch_name, None, 0, -1)
+                self._make_logical_link(switch_name, logical_link)
+                if logical_link.type is None:
+                    self.log.error("Unable to trace logical uplink for %s", switch_name)
+                    return False
+
+                self.logical_links.append(logical_link)
 
         return True
 
@@ -261,7 +263,7 @@ class NocPlugin(object):
         label += '<tr><td port="input"></td></tr></table>>'
         return label
 
-    def _link_label_and_colour(self, link):
+    def _physical_link_label_and_colour(self, link):
         open = ''
         close = ''
         label = '<'
@@ -291,8 +293,37 @@ class NocPlugin(object):
         label += close + '>'
         return colour, label
 
+    def _logical_link_label_and_colour(self, logical_link):
+        # open = ''
+        # close = ''
+        label = '<'
+        label += '{}m'.format(str(logical_link.total_length)) + " " + logical_link.type
+
+        if logical_link.type == 'fibre':
+            if logical_link.couplers == 0:
+                label += ' (direct)'
+            else:
+                label += ' ({} coupler{})'.format(logical_link.couplers, '' if logical_link.couplers == 1 else 's')
+            colour = self.COLOUR_FIBRE
+        elif logical_link.type == 'copper':
+            # length = float(logical_link.length)
+            # if logical_link.cores and int(logical_link.cores) > 1:
+            #     label += '<b>{}x</b> '.format(logical_link.cores)
+            # label += self.get_link_medium(logical_link)
+
+            colour = self.COLOUR_COPPER
+        else:
+            self.log.error("Invalid type %s for link between %s and %s", logical_link.type, logical_link.from_switch, logical_link.to_switch)
+            return None, None
+
+        # label += '<br/>' + open
+        # label += close
+        label += '>'
+        return colour, label
+
     def _create_base_dot(self, subheading):
         dot = pydot.Dot("NOC", graph_type='digraph', strict=True)
+        dot.set_prog('neato')
         dot.set_node_defaults(shape='none', fontsize=14, margin=0, fontname='Arial')
         dot.set_edge_defaults(fontsize=13, fontname='Arial')
         # dot.set_page('11.7,8.3!')
@@ -327,7 +358,30 @@ class NocPlugin(object):
         for link in self.links:
             edge = pydot.Edge(link.from_switch, link.to_switch)
 
-            colour, label = self._link_label_and_colour(link)
+            colour, label = self._physical_link_label_and_colour(link)
+            if label is None:
+                return None
+
+            # edge.set_tailport('{}-{}'.format(edgedata['current'], edgedata['phases']))
+            edge.set_headport('input')
+            edge.set_label(label)
+            edge.set_color(colour)
+            sg.add_edge(edge)
+
+        return dot
+
+    def create_logical_dot(self):
+        self.log.info("Generating logical graph")
+        dot, sg = self._create_base_dot("NOC Logical")
+
+        for switch in self.switches.values():
+            node = pydot.Node(switch.name, label=self._switch_label(switch))
+            sg.add_node(node)
+
+        for logical_link in self.logical_links:
+            edge = pydot.Edge(logical_link.from_switch, logical_link.to_switch)
+
+            colour, label = self._logical_link_label_and_colour(logical_link)
             if label is None:
                 return None
 
@@ -365,14 +419,14 @@ class NocPlugin(object):
         if not os.path.isdir(out_path):
             os.makedirs(out_path)
 
-        # Switches.csv
+        # switches.csv
         with open(os.path.join(out_path, 'switches.csv'), 'w') as switches_file:
             writer = csv.writer(switches_file)
             writer.writerow(['Switch-Name'])
             for switch in sorted(self.switches.values()):
                 writer.writerow(switch)
 
-        # Links.csv
+        # links.csv
         with open(os.path.join(out_path, 'links.csv'), 'w') as links_file:
             writer = csv.writer(links_file)
             writer.writerow(['From-Switch', 'To-Switch', 'Type', 'Subtype', 'Length', 'Cores'])
@@ -380,11 +434,19 @@ class NocPlugin(object):
                 writer.writerow([link.from_switch, link.to_switch, link.type, self.get_link_medium(link),
                                  link.length, link.cores])
 
-        # Warnings.txt
+        # links-logical.csv
+        with open(os.path.join(out_path, 'links-logical.csv'), 'w') as links_file:
+            writer = csv.writer(links_file)
+            writer.writerow(['From-Switch', 'To-Switch', 'Type', 'Total-Length', 'Couplers'])
+            for logical_link in self.logical_links:
+                writer.writerow([logical_link.from_switch, logical_link.to_switch, logical_link.type,
+                                 logical_link.total_length, logical_link.couplers])
+
+        # warnings.txt
         with open(os.path.join(out_path, 'warnings.txt'), 'w') as warnings_file:
             warnings_file.writelines("\n".join(self.warnings))
 
-        # Stats.txt
+        # stats.txt
         with open(os.path.join(out_path, 'stats.txt'), 'w') as stats_file:
             couplers = 0
             for logical_link in self.logical_links:
@@ -398,3 +460,10 @@ class NocPlugin(object):
             return
         with open(os.path.join(out_path, 'noc-physical.pdf'), 'wb') as f:
             f.write(physical_dot.create_pdf())
+
+        # noc-logical.pdf
+        logical_dot = self.create_logical_dot()
+        if not logical_dot:
+            return
+        with open(os.path.join(out_path, 'noc-logical.pdf'), 'wb') as f:
+            f.write(logical_dot.create_pdf())
