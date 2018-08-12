@@ -242,10 +242,10 @@ class NocPlugin(object):
 
         return True
 
-    def _title_label(self, name):
+    def _title_label(self, name, subheading):
         label = '<<table border="0" cellspacing="0" cellborder="1" cellpadding="5">'
         label += '<tr><td bgcolor="{}"><b>{}</b></td></tr>'.format(self.COLOUR_HEADER, name)
-        label += '<tr><td>NOC Plan</td></tr>'
+        label += '<tr><td>{}</td></tr>'.format(subheading)
         label += '<tr><td>{}</td></tr>'.format(date.today().isoformat())
         label += '</table>>'
         return label
@@ -291,9 +291,7 @@ class NocPlugin(object):
         label += close + '>'
         return colour, label
 
-    def create_dot(self):
-        self.log.info("Generating physical graph")
-
+    def _create_base_dot(self, subheading):
         dot = pydot.Dot("NOC", graph_type='digraph', strict=True)
         dot.set_node_defaults(shape='none', fontsize=14, margin=0, fontname='Arial')
         dot.set_edge_defaults(fontsize=13, fontname='Arial')
@@ -305,7 +303,22 @@ class NocPlugin(object):
         dot.set_nodesep(0.3)
         # dot.set_splines('line')
 
-        sg = pydot.Cluster('physical', label='Physical')
+        sg = pydot.Cluster()  # 'physical', label='Physical')
+        # sg.set_color('gray80')
+        sg.set_style('invis')
+        # sg.set_labeljust('l')
+        dot.add_subgraph(sg)
+
+        title = pydot.Node('title', shape='none', label=self._title_label(self.opts.get('name'), subheading))
+        title.set_pos('0,0!')
+        title.set_fontsize(18)
+        dot.add_node(title)
+
+        return dot, sg
+
+    def create_physical_dot(self):
+        self.log.info("Generating physical graph")
+        dot, sg = self._create_base_dot("NOC Physical")
 
         for switch in self.switches.values():
             node = pydot.Node(switch.name, label=self._switch_label(switch))
@@ -323,16 +336,6 @@ class NocPlugin(object):
             edge.set_label(label)
             edge.set_color(colour)
             sg.add_edge(edge)
-
-        sg.set_color('gray80')
-        sg.set_style('dashed')
-        sg.set_labeljust('l')
-        dot.add_subgraph(sg)
-
-        title = pydot.Node('title', shape='none', label=self._title_label(self.opts.get('name')))
-        title.set_pos('0,0!')
-        title.set_fontsize(18)
-        dot.add_node(title)
 
         return dot
 
@@ -390,9 +393,8 @@ class NocPlugin(object):
             stats_file.write("Fibre couplers: %d\n" % (couplers))
 
         # noc-physical.pdf
-        dot = self.create_dot()
-        if not dot:
+        physical_dot = self.create_physical_dot()
+        if not physical_dot:
             return
         with open(os.path.join(out_path, 'noc-physical.pdf'), 'wb') as f:
-            f.write(dot.create_pdf())
-
+            f.write(physical_dot.create_pdf())
