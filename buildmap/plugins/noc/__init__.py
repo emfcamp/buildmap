@@ -19,6 +19,15 @@ class Link:
         self.cores = cores
 
 
+class LogicalLink:
+    def __init__(self, from_switch, to_switch, type, total_length, couplers):
+        self.from_switch = from_switch
+        self.to_switch = to_switch
+        self.type = type
+        self.total_length = total_length
+        self.couplers = couplers
+
+
 class NocPlugin(object):
     BUFFER = 1
     UPDOWN_LENGTH = 6  # How many metres to add per and up-and-down a festoon pole
@@ -40,6 +49,7 @@ class NocPlugin(object):
         self.links = []
         self.processed_links = set()
         self.processed_switches = set()
+        self.logical_links = []
         self.warnings = []
 
     def generate_layers_config(self):
@@ -115,9 +125,9 @@ class NocPlugin(object):
             # self.log.info("Link from %s to %s" % (from_switch, to_switch))
 
             type = self.link_layers[row['layer']]
-            total_length = row['length']
+            length = row['length']
             if row['updowns'] is not None:
-                total_length += int(row['updowns']) * self.UPDOWN_LENGTH
+                length += int(row['updowns']) * self.UPDOWN_LENGTH
 
             if row['cores']:
                 cores = int(row['cores'])
@@ -125,7 +135,7 @@ class NocPlugin(object):
                 self._warning("%s link from %s to %s had no cores, assuming 1" % (type.title(), from_switch, to_switch))
                 cores = 1
 
-            yield Link(from_switch, to_switch, type, total_length, cores)
+            yield Link(from_switch, to_switch, type, length, cores)
 
     def order_links_from_switch(self, switch_name):
         if switch_name in self.processed_switches:
@@ -157,6 +167,42 @@ class NocPlugin(object):
 
         return cores
 
+    def _make_logical_link(self, switch_name, logical_link):
+        # Find our uplink. Assumption: only one uplink (fine for layer 2 design).
+        # Physical links have already been ordered by this point so that "from_switch" is the core end.
+        for link in self.links:
+            if link.to_switch == switch_name:
+                print("Uplink from %s is to %s" % (switch_name, link.from_switch))
+
+                # If we're extending:
+                if logical_link.type is not None:
+                    # If it's copper and it's not our first link, we're done, we can't extend any further.
+                    # if link.type == 'copper' and :
+                    #     return
+
+                    # We can't extend to a different medium
+                    if link.type != logical_link.type:
+                        print("Can't extend %s onto %s" % (logical_link.type, link.type))
+                        return
+
+                # Extend to this switch
+                logical_link.from_switch = link.from_switch
+                logical_link.type = link.type
+                logical_link.total_length += link.length
+                logical_link.couplers += 1
+                print("Extend back from %s to %s, type %s, length now %d with %d couplers" %
+                      (logical_link.to_switch, link.from_switch, logical_link.type, logical_link.total_length, logical_link.couplers))
+
+                # If it's fibre, we can try to continue extending
+                if logical_link.type == 'fibre':
+                    self._make_logical_link(link.from_switch, logical_link)
+                else:
+                    print("Don't try to continue %s" % logical_link.type)
+
+                return
+
+        print("No uplink found from %s" % switch_name)
+
     def generate_plan(self):
         for switch in self.get_switches():
             self.switches[switch.name] = switch
@@ -174,6 +220,25 @@ class NocPlugin(object):
         # Each incoming fibre to a switch should have (1+sum(child_fibre_links.cores))
 
         self._validate_child_link_cores(root.name)
+
+        # Create the logical links
+        # We assume that any switch that is fibre in and fibre out is simply patched through with a coupler,
+        # collapsing the two physical links into a single logical one
+        #
+        # Note that we can't assume it is fibre all the way back to the core, e.g. in 2018 this string is 3 logical links:
+        # ESNORE [fibre] SWDKG1 [fibre] SWDKE2 [copper] SWWORKSHOP1 [fibre] SWDKF1
+        #        ----------------------        --------             -------
+        # We might in the future also need a way to put a "break" in here for fibre aggregation switches, e.g.
+        # ESNORE [single core fibre] SWMIDDLE [8 single fibres] 8xDKs
+
+        # So for every switch
+        # (a) If incoming is copper, a single logical link to its immediate parent
+        # (b) If incoming is fibre, a single logical link to the highest parent that is either core or doesn't itself have incoming fibre
+
+        for switch_name in self.switches:
+            logical_link = LogicalLink(None, switch_name, None, 0, -1)
+            self._make_logical_link(switch_name, logical_link)
+            self.logical_links.append(logical_link)
 
         return True
 
@@ -227,7 +292,7 @@ class NocPlugin(object):
         return colour, label
 
     def create_dot(self):
-        self.log.info("Generating graph")
+        self.log.info("Generating physical graph")
 
         dot = pydot.Dot("NOC", graph_type='digraph', strict=True)
         dot.set_node_defaults(shape='none', fontsize=14, margin=0, fontname='Arial')
@@ -297,12 +362,14 @@ class NocPlugin(object):
         if not os.path.isdir(out_path):
             os.makedirs(out_path)
 
+        # Switches.csv
         with open(os.path.join(out_path, 'switches.csv'), 'w') as switches_file:
             writer = csv.writer(switches_file)
             writer.writerow(['Switch-Name'])
             for switch in sorted(self.switches.values()):
                 writer.writerow(switch)
 
+        # Links.csv
         with open(os.path.join(out_path, 'links.csv'), 'w') as links_file:
             writer = csv.writer(links_file)
             writer.writerow(['From-Switch', 'To-Switch', 'Type', 'Subtype', 'Length', 'Cores'])
@@ -310,11 +377,22 @@ class NocPlugin(object):
                 writer.writerow([link.from_switch, link.to_switch, link.type, self.get_link_medium(link),
                                  link.length, link.cores])
 
+        # Warnings.txt
         with open(os.path.join(out_path, 'warnings.txt'), 'w') as warnings_file:
             warnings_file.writelines("\n".join(self.warnings))
 
+        # Stats.txt
+        with open(os.path.join(out_path, 'stats.txt'), 'w') as stats_file:
+            couplers = 0
+            for logical_link in self.logical_links:
+                if logical_link.type == 'fibre':
+                    couplers += logical_link.couplers
+            stats_file.write("Fibre couplers: %d\n" % (couplers))
+
+        # noc-physical.pdf
         dot = self.create_dot()
         if not dot:
             return
         with open(os.path.join(out_path, 'noc-physical.pdf'), 'wb') as f:
             f.write(dot.create_pdf())
+
