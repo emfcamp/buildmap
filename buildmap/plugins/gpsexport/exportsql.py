@@ -1,3 +1,4 @@
+# flake8: noqa
 queries = {
     "TentCentres": """SELECT tent as name, 
  tent_size,

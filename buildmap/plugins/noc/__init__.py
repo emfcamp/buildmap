@@ -155,7 +155,7 @@ class NocPlugin(object):
                             entityhandle,
                             ogc_fid
                         FROM site_plan
-                        WHERE layer = ANY(:link_layers) 
+                        WHERE layer = ANY(:link_layers)
                         AND ST_GeometryType(wkb_geometry) = 'ST_LineString'
                     """
         )
