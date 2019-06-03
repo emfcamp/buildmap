@@ -16,7 +16,7 @@ class MapDB(object):
 
     # Regex to match common embedded DXF text formatting codes. Probably not exhaustive.
     # c.f. http://www.cadforum.cz/cadforum_en/text-formatting-codes-in-mtext-objects-tip8640
-    MTEXT_FORMAT_REGEX = r'(\\[A-Za-z]([A-Za-z0-9\.\|]+;))*'
+    MTEXT_FORMAT_REGEX = r"(\\[A-Za-z]([A-Za-z0-9\.\|]+;))*"
 
     def __init__(self, url):
         self.log = logging.getLogger(self.__class__.__name__)
@@ -30,7 +30,14 @@ class MapDB(object):
             self.log.error("Error connecting to database (%s): %s", self.url, e)
             return False
 
-        if len(self.execute(text("SELECT * FROM pg_extension WHERE extname = 'postgis'")).fetchall()) == 0:
+        if (
+            len(
+                self.execute(
+                    text("SELECT * FROM pg_extension WHERE extname = 'postgis'")
+                ).fetchall()
+            )
+            == 0
+        ):
             self.log.error("Database %s does not have PostGIS installed", self.url)
             return False
 
@@ -51,39 +58,54 @@ class MapDB(object):
         """
         known_attributes = set()
         attributes = defaultdict(list)
-        result = self.conn.execute(text("""SELECT ogc_fid, extendedentity FROM %s
-                                        WHERE extendedentity IS NOT NULL""" % table_name))
+        result = self.conn.execute(
+            text(
+                """SELECT ogc_fid, extendedentity FROM %s
+                                        WHERE extendedentity IS NOT NULL"""
+                % table_name
+            )
+        )
         for record in result:
             # Curly braces surround some sets of attributes for some reason.
-            attrs = record[1].strip(' {}')
+            attrs = record[1].strip(" {}")
             try:
-                for attr in attrs.split(' '):
+                for attr in attrs.split(" "):
                     # Some DXFs seem to separate keys/values with :, some with =
-                    if ':' in attr:
-                        name, value = attr.split(':', 1)
-                    elif '=' in attr:
-                        name, value = attr.split('=', 1)
+                    if ":" in attr:
+                        name, value = attr.split(":", 1)
+                    elif "=" in attr:
+                        name, value = attr.split("=", 1)
                     else:
                         continue
 
                     # Replace the dot character with underscore, as it's not valid in SQL
-                    name = name.replace('.', '_')
+                    name = name.replace(".", "_")
                     known_attributes.add(name)
                     attributes[record[0]].append((name, value))
             except ValueError:
                 # This is ambiguous to parse, I think it's GDAL's fault for cramming them
                 # into one field
-                self.log.error("Cannot extract attributes as an attribute field contains a space: %s",
-                               attrs)
+                self.log.error(
+                    "Cannot extract attributes as an attribute field contains a space: %s",
+                    attrs,
+                )
                 continue
 
         for attr_name in known_attributes:
-            self.conn.execute(text("ALTER TABLE %s ADD COLUMN %s TEXT" % (table_name, attr_name)))
+            self.conn.execute(
+                text("ALTER TABLE %s ADD COLUMN %s TEXT" % (table_name, attr_name))
+            )
 
         for ogc_fid, attrs in attributes.items():
             for name, value in attrs:
-                self.conn.execute(text("UPDATE %s SET %s = :value WHERE ogc_fid = :fid" %
-                                  (table_name, name.lower())), value=value, fid=ogc_fid)
+                self.conn.execute(
+                    text(
+                        "UPDATE %s SET %s = :value WHERE ogc_fid = :fid"
+                        % (table_name, name.lower())
+                    ),
+                    value=value,
+                    fid=ogc_fid,
+                )
         return known_attributes
 
     def get_bounds(self, table_name, srs=4326):
@@ -91,8 +113,12 @@ class MapDB(object):
         # Performance note: it's neater to transform coordinates to the target SRS before
         # running ST_Extent, as it doesn't require us knowing what the table SRS is, but
         # this is obviously much slower. It doesn't seem to be an issue so far though.
-        res = self.conn.execute(text("SELECT ST_AsEWKT(ST_Extent(ST_Transform(wkb_geometry, %s))) FROM %s"
-                                     % (srs, table_name))).first()
+        res = self.conn.execute(
+            text(
+                "SELECT ST_AsEWKT(ST_Extent(ST_Transform(wkb_geometry, %s))) FROM %s"
+                % (srs, table_name)
+            )
+        ).first()
         return wkt.loads(res[0])
 
     def create_bounding_layer(self, table_name, bbox, srid=4326):
@@ -104,43 +130,79 @@ class MapDB(object):
         """
         with self.conn.begin():
             self.conn.execute(text('DROP TABLE IF EXISTS "%s"' % table_name))
-            self.conn.execute(text('''CREATE TABLE "%s" (
+            self.conn.execute(
+                text(
+                    """CREATE TABLE "%s" (
                                         id SERIAL PRIMARY KEY,
                                         wkb_geometry geometry(POLYGON, %s))
-                                   ''' % (table_name, srid)))
-            self.conn.execute(text('''INSERT INTO "%s" (wkb_geometry) VALUES (
+                                   """
+                    % (table_name, srid)
+                )
+            )
+            self.conn.execute(
+                text(
+                    """INSERT INTO "%s" (wkb_geometry) VALUES (
                                    ST_SetSRID('%s'::geometry, %s))
-                                   ''' % (table_name, bbox.wkt, srid)))
+                                   """
+                    % (table_name, bbox.wkt, srid)
+                )
+            )
 
     def clean_layers(self, table_name):
         """ Tidy up some mess in Postgres which ogr2ogr makes when importing DXFs. """
         with self.conn.begin():
             # Fix newlines in labels
-            self.conn.execute(text("UPDATE %s SET text = replace(text, '^J', '\n')" % table_name))
+            self.conn.execute(
+                text("UPDATE %s SET text = replace(text, '^J', '\n')" % table_name)
+            )
             # Remove "SOLID" labels from fills
-            self.conn.execute(text("UPDATE %s SET text = NULL WHERE text = 'SOLID'" % table_name))
+            self.conn.execute(
+                text("UPDATE %s SET text = NULL WHERE text = 'SOLID'" % table_name)
+            )
             # Strip formatting codes from text
-            self.conn.execute(text("UPDATE %s SET text = regexp_replace(text, '%s', '')" %
-                                   (table_name, self.MTEXT_FORMAT_REGEX)))
+            self.conn.execute(
+                text(
+                    "UPDATE %s SET text = regexp_replace(text, '%s', '')"
+                    % (table_name, self.MTEXT_FORMAT_REGEX)
+                )
+            )
             # Convert closed linestrings to polygons
-            self.conn.execute(text("""UPDATE %s SET wkb_geometry = ST_MakePolygon(wkb_geometry)
+            self.conn.execute(
+                text(
+                    """UPDATE %s SET wkb_geometry = ST_MakePolygon(wkb_geometry)
                                       WHERE ST_IsClosed(wkb_geometry)
                                       AND ST_GeometryType(wkb_geometry) = 'ST_LineString'
-                                      AND ST_NumPoints(wkb_geometry) > 3""" % table_name))
+                                      AND ST_NumPoints(wkb_geometry) > 3"""
+                    % table_name
+                )
+            )
             # Force geometries to use right-hand rule
-            self.conn.execute(text("UPDATE %s SET wkb_geometry = ST_ForceRHR(wkb_geometry)" % table_name))
+            self.conn.execute(
+                text(
+                    "UPDATE %s SET wkb_geometry = ST_ForceRHR(wkb_geometry)"
+                    % table_name
+                )
+            )
             # Drop the "subclasses" column which contains the original DXF geometry type.
             # This could be misleading after the above transformations, and using
             # ST_GeometryType is better practice anyway.
-            self.conn.execute(text("ALTER TABLE %s DROP COLUMN subclasses" % table_name))
+            self.conn.execute(
+                text("ALTER TABLE %s DROP COLUMN subclasses" % table_name)
+            )
             # Create layer index to speed up querying
-            self.conn.execute(text("CREATE INDEX %s_layer on %s(layer)" % (table_name, table_name)))
+            self.conn.execute(
+                text("CREATE INDEX %s_layer on %s(layer)" % (table_name, table_name))
+            )
 
     def prefix_handles(self, table_name, prefix):
         """ Prefix entity handles to avoid collisions with multiple DXF files. """
         with self.conn.begin():
-            self.conn.execute(text("UPDATE %s SET entityhandle = '%s' || entityhandle" %
-                                   (table_name, prefix)))
+            self.conn.execute(
+                text(
+                    "UPDATE %s SET entityhandle = '%s' || entityhandle"
+                    % (table_name, prefix)
+                )
+            )
 
     def get_layer_type(self, table_name, layer_name):
         with self.conn.begin():
@@ -152,9 +214,8 @@ class MapDB(object):
                             FROM {table} WHERE layer = '{layer}'
                             AND st_geometrytype(wkb_geometry) != 'ST_GeometryCollection'
                     ) AS t""".format(
-                        table=table_name,
-                        layer=layer_name
-                    )
+                table=table_name, layer=layer_name
+            )
             result = self.conn.execute(text(sql))
             return [row[0] for row in result]
 

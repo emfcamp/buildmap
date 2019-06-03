@@ -38,13 +38,20 @@ class TegolaExporter(Exporter):
             # We can handle those in get_layer_sql
             types = self.db.get_layer_type(table_name, layer_name)
             if len(types) == 1:
-                yield (table_name, layer_name, self.get_layer_sql(table_name, layer_name, types[0]))
+                yield (
+                    table_name,
+                    layer_name,
+                    self.get_layer_sql(table_name, layer_name, types[0]),
+                )
             else:
                 # Multiple simple types. Split them into different layers.
                 for typ in types:
-                    type_alias = typ.lower().split('_')[1]
-                    yield (table_name, layer_name + '_' + type_alias,
-                           self.get_layer_sql(table_name, layer_name, typ))
+                    type_alias = typ.lower().split("_")[1]
+                    yield (
+                        table_name,
+                        layer_name + "_" + type_alias,
+                        self.get_layer_sql(table_name, layer_name, typ),
+                    )
 
     def generate_tegola_config(self):
         provider = {
@@ -57,58 +64,62 @@ class TegolaExporter(Exporter):
             "password": self.db.url.password,
             "srid": self.SRID,
             "max_connections": 20,
-            "layers": []
+            "layers": [],
         }
 
         layers = list(self.get_layers())
 
         for table_name, layer_name, sql in layers:
-            provider["layers"].append({
-                "name": sanitise_layer(layer_name),
-                "sql": sql
-            })
+            provider["layers"].append({"name": sanitise_layer(layer_name), "sql": sql})
 
         m = {
             "name": "buildmap",
             "bounds": list(self.buildmap.get_bbox().bounds),
-            "center": self.buildmap.get_center() + [float(self.config['zoom_range'][0])],
-            "layers": []
+            "center": self.buildmap.get_center()
+            + [float(self.config["zoom_range"][0])],
+            "layers": [],
         }
 
-        if type(self.config['mapbox_vector_layer']) is dict and \
-                'attribution' in self.config['mapbox_vector_layer']:
-            m['attribution'] = self.config['mapbox_vector_layer']['attribution']
+        if (
+            type(self.config["mapbox_vector_layer"]) is dict
+            and "attribution" in self.config["mapbox_vector_layer"]
+        ):
+            m["attribution"] = self.config["mapbox_vector_layer"]["attribution"]
 
         for table_name, layer_name, _ in layers:
-            m["layers"].append({
-                "provider_layer": "%s.%s" % (self.PROVIDER_NAME, sanitise_layer(layer_name)),
-                "min_zoom": self.config['zoom_range'][0],
-                "max_zoom": self.config['zoom_range'][1]
-            })
+            m["layers"].append(
+                {
+                    "provider_layer": "%s.%s"
+                    % (self.PROVIDER_NAME, sanitise_layer(layer_name)),
+                    "min_zoom": self.config["zoom_range"][0],
+                    "max_zoom": self.config["zoom_range"][1],
+                }
+            )
 
         # Add bounding box layer to config
-        provider["layers"].append({
-            "name": "bounding_box",
-            "sql": """SELECT id AS gid, ST_AsBinary(ST_Transform(wkb_geometry, 3857)) AS geom
+        provider["layers"].append(
+            {
+                "name": "bounding_box",
+                "sql": """SELECT id AS gid, ST_AsBinary(ST_Transform(wkb_geometry, 3857)) AS geom
                         FROM bounding_box
                         WHERE ST_Transform(wkb_geometry, 3857) && !BBOX!
-                   """
-        })
+                   """,
+            }
+        )
 
-        m["layers"].append({
-            "provider_layer": "%s.bounding_box" % (self.PROVIDER_NAME),
-            "min_zoom": self.config['zoom_range'][0],
-            "max_zoom": self.config['zoom_range'][1]
-        })
+        m["layers"].append(
+            {
+                "provider_layer": "%s.bounding_box" % (self.PROVIDER_NAME),
+                "min_zoom": self.config["zoom_range"][0],
+                "max_zoom": self.config["zoom_range"][1],
+            }
+        )
 
         # Construct config
         data = {
-            "cache": {
-                "type": "file",
-                "basepath": "/tmp/tegola"
-            },
+            "cache": {"type": "file", "basepath": "/tmp/tegola"},
             "providers": [provider],
-            "maps": [m]
+            "maps": [m],
         }
         return data
 
@@ -121,16 +132,19 @@ class TegolaExporter(Exporter):
             We'll extract entities of the specified type from any ST_GeometryCollections
             (which are generated from DXF blocks).
         """
-        geom_field = 'wkb_geometry'
-        fid_field = 'ogc_fid'
-        additional_fields = ['text', 'entityhandle'] + list(self.buildmap.known_attributes[table_name])
+        geom_field = "wkb_geometry"
+        fid_field = "ogc_fid"
+        additional_fields = ["text", "entityhandle"] + list(
+            self.buildmap.known_attributes[table_name]
+        )
 
-        type_map = {'ST_Point': 1, 'ST_LineString': 2, 'ST_Polygon': 3}
+        type_map = {"ST_Point": 1, "ST_LineString": 2, "ST_Polygon": 3}
 
         # Return all table entries, plus the contents of all GeometryCollections.
         query = "(SELECT {fields} FROM {table}".format(
             fields=", ".join([geom_field, fid_field, "layer"] + additional_fields),
-            table=table_name)
+            table=table_name,
+        )
         query += " UNION ALL "
         # It would be nicer to use ST_Dump here, but we can't simply split each GeometryCollection
         # into its component parts because MVT requires unique IDs, and we'll lose the connection between
@@ -139,19 +153,26 @@ class TegolaExporter(Exporter):
         query += """SELECT ST_CollectionExtract({geom_field}, {geom_type}) AS {geom_field},
                     {fields} FROM {table}
                     WHERE ST_GeometryType({geom_field}) = 'ST_GeometryCollection'""".format(
-            geom_field=geom_field, geom_type=type_map[geometry_type],
+            geom_field=geom_field,
+            geom_type=type_map[geometry_type],
             fields=", ".join([fid_field, "layer"] + additional_fields),
-            table=table_name
+            table=table_name,
         )
         query += ") AS t"
         table_name = query
 
         # Add derived fields based on geometry type
-        if geometry_type == 'ST_LineString':
-            additional_fields.append('round(ST_Length(%s)::numeric, 1) AS length' % geom_field)
-        elif geometry_type == 'ST_Polygon':
-            additional_fields.append('round(ST_Perimeter(%s)::numeric, 1) AS perimeter' % geom_field)
-            additional_fields.append('round(ST_Area(%s)::numeric, 1) AS area' % geom_field)
+        if geometry_type == "ST_LineString":
+            additional_fields.append(
+                "round(ST_Length(%s)::numeric, 1) AS length" % geom_field
+            )
+        elif geometry_type == "ST_Polygon":
+            additional_fields.append(
+                "round(ST_Perimeter(%s)::numeric, 1) AS perimeter" % geom_field
+            )
+            additional_fields.append(
+                "round(ST_Area(%s)::numeric, 1) AS area" % geom_field
+            )
 
         sql = """SELECT %s AS gid,
                          ST_AsBinary(ST_Transform(%s, %s)) AS geom,
@@ -159,19 +180,29 @@ class TegolaExporter(Exporter):
                   FROM %s
                   WHERE layer = '%s'
                   AND ST_Transform(wkb_geometry, %s) && !BBOX! """ % (
-            fid_field, geom_field, self.SRID, ", ".join(additional_fields), table_name, layer_name, self.SRID)
+            fid_field,
+            geom_field,
+            self.SRID,
+            ", ".join(additional_fields),
+            table_name,
+            layer_name,
+            self.SRID,
+        )
 
         # Filter the result by the type of geometry we're looking for, taking into account MultiGeometries.
         type_synonyms = {
-            'ST_LineString': ['ST_Line', 'ST_LineString', 'ST_MultiLineString'],
-            'ST_Polygon': ['ST_Polygon', 'ST_MultiPolygon'],
-            'ST_Point': ['ST_Point', 'ST_MultiPoint']
+            "ST_LineString": ["ST_Line", "ST_LineString", "ST_MultiLineString"],
+            "ST_Polygon": ["ST_Polygon", "ST_MultiPolygon"],
+            "ST_Point": ["ST_Point", "ST_MultiPoint"],
         }
 
-        sql += "AND ST_GeometryType(wkb_geometry) IN (" + \
-            " ,".join("'" + t + "'" for t in type_synonyms[geometry_type]) + ")"
+        sql += (
+            "AND ST_GeometryType(wkb_geometry) IN ("
+            + " ,".join("'" + t + "'" for t in type_synonyms[geometry_type])
+            + ")"
+        )
 
         # Tidy up the SQL string so it's more readable in the tegola config
-        sql = re.sub(r'\s+', ' ', sql)
+        sql = re.sub(r"\s+", " ", sql)
 
         return sql

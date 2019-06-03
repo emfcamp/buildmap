@@ -18,7 +18,7 @@ class GPSExport(object):
         self.queries = exportsql.queries
         self.config = config
         self.base_path = os.path.dirname(os.path.abspath(__file__))
-        self.temp_dir = os.path.join(self.base_path, 'temp')
+        self.temp_dir = os.path.join(self.base_path, "temp")
         self.db = db
         shutil.rmtree(self.temp_dir, True)
         os.makedirs(self.temp_dir)
@@ -27,37 +27,35 @@ class GPSExport(object):
         return self.db.execute(text(query)).fetchall()
 
     def generate_kml(self, dir, name, places):
-        if 'kml' not in places[0].keys():
+        if "kml" not in places[0].keys():
             return
-        env = Environment(loader=PackageLoader('buildmap', 'templates'))
-        template = env.get_template('kml.jinja')
-        write_file(os.path.join(dir, name + '.kml'),
-                   template.render(places=places))
+        env = Environment(loader=PackageLoader("buildmap", "templates"))
+        template = env.get_template("kml.jinja")
+        write_file(os.path.join(dir, name + ".kml"), template.render(places=places))
         if name in self.filesToList:
-            self.filesToList[name].append('kml')
+            self.filesToList[name].append("kml")
         else:
-            self.filesToList[name] = ['kml']
+            self.filesToList[name] = ["kml"]
 
     def generate_csv(self, dir, name, places):
-        with open(os.path.join(dir, name + '.csv'), 'w') as csvfile:
+        with open(os.path.join(dir, name + ".csv"), "w") as csvfile:
             fieldnames = places[0].keys()
             fieldnames.sort()
-            if 'name' in fieldnames:
-                fieldnames.insert(0, fieldnames.pop(fieldnames.index('name')))
+            if "name" in fieldnames:
+                fieldnames.insert(0, fieldnames.pop(fieldnames.index("name")))
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             for place in places:
                 writer.writerow({k: v for k, v in place.items() if k in fieldnames})
             if name in self.filesToList:
-                self.filesToList[name].append('csv')
+                self.filesToList[name].append("csv")
             else:
-                self.filesToList[name] = ['csv']
+                self.filesToList[name] = ["csv"]
 
     def generate_html(self, dir, files):
-        env = Environment(loader=PackageLoader('buildmap', 'templates'))
-        template = env.get_template('export-html.jinja')
-        write_file(os.path.join(dir, 'export.html'),
-                   template.render(files=files))
+        env = Environment(loader=PackageLoader("buildmap", "templates"))
+        template = env.get_template("export-html.jinja")
+        write_file(os.path.join(dir, "export.html"), template.render(files=files))
 
     def run(self):
         start_time = time.time()
