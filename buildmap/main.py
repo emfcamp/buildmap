@@ -18,6 +18,13 @@ from .mapdb import MapDB
 from . import plugins  # noqa
 
 
+def run():
+    """ Console script entry point """
+    logging.basicConfig(level=logging.INFO)
+    bm = BuildMap()
+    bm.run()
+
+
 class BuildMap(object):
     def __init__(self):
         self.log = logging.getLogger(self.__class__.__name__)
