@@ -186,7 +186,8 @@ class BuildMap(object):
             if "path" not in source_file_data:
                 self.log.error("No path found for source %s", table_name)
                 return
-            self.import_dxf(source_file_data["path"], table_name)
+            path = self.resolve_path(source_file_data["path"])
+            self.import_dxf(path, table_name)
 
         self.log.info(
             "Map bounds (N, E, S, W): %s", list(reversed(self.get_bbox().bounds))
