@@ -1,8 +1,7 @@
-# coding=utf-8
-from __future__ import division, absolute_import, print_function, unicode_literals
 from collections import defaultdict
 import logging
 import sqlalchemy
+from time import sleep
 from shapely import wkt
 from sqlalchemy.sql import text
 
@@ -24,11 +23,20 @@ class MapDB(object):
 
     def connect(self):
         engine = sqlalchemy.create_engine(self.url)
-        try:
-            self.conn = engine.connect()
-        except sqlalchemy.exc.OperationalError as e:
-            self.log.error("Error connecting to database (%s): %s", self.url, e)
-            return False
+
+        # Retry connection indefinitely, to aid running in Docker
+        connected = False
+        while not connected:
+            try:
+                self.conn = engine.connect()
+                connected = True
+            except sqlalchemy.exc.OperationalError as e:
+                self.log.error(
+                    "Error connecting to database (%s) - waiting to retry: %s.",
+                    self.url,
+                    e,
+                )
+                sleep(5)
 
         if (
             len(
