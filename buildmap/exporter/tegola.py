@@ -138,7 +138,7 @@ class TegolaExporter(Exporter):
             self.buildmap.known_attributes[table_name]
         )
 
-        type_map = {"ST_Point": 1, "ST_LineString": 2, "ST_Polygon": 3}
+        type_map = {"ST_Point": 1, "ST_LineString": 2, "ST_MultiLineString": 2, "ST_Polygon": 3}
 
         # Return all table entries, plus the contents of all GeometryCollections.
         query = "(SELECT {fields} FROM {table}".format(
@@ -192,6 +192,7 @@ class TegolaExporter(Exporter):
         # Filter the result by the type of geometry we're looking for, taking into account MultiGeometries.
         type_synonyms = {
             "ST_LineString": ["ST_Line", "ST_LineString", "ST_MultiLineString"],
+            "ST_MultiLineString": ["ST_Line", "ST_LineString", "ST_MultiLineString"],
             "ST_Polygon": ["ST_Polygon", "ST_MultiPolygon"],
             "ST_Point": ["ST_Point", "ST_MultiPoint"],
         }
