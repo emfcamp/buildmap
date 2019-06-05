@@ -29,12 +29,22 @@ class LogicalLink:
 
 
 class NocPlugin(object):
+
+    # Tolerance for how close a link must be to a switch to consider that it connects (metres)
     BUFFER = 1
-    UPDOWN_LENGTH = 6  # How many metres to add per and up-and-down a festoon pole
+
+    # How many metres to add per and up-and-down a festoon pole
+    UPDOWN_LENGTH = 6
+
+    # Colours for the output diagrams - https://graphviz.org/doc/info/colors.html
     COLOUR_HEADER = "lightcyan1"
     COLOUR_COPPER = "slateblue4"
     COLOUR_FIBRE = "goldenrod"
+
+    # Copper links below this length are considered to be CCA
     LENGTH_COPPER_NOT_CCA = 30
+
+    # Copper links above these lengths will generate warnings or errors
     LENGTH_COPPER_WARNING = 70
     LENGTH_COPPER_CRITICAL = 90
 
