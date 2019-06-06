@@ -124,7 +124,7 @@ class BuildMap(object):
 
             # If we're configured to auto-import layers, add layers without a
             # defined order to the bottom of the layer order stack
-            if source_file.get("auto_import_layers", "true") == "true":
+            if source_file.get("auto_import_layers", True):
                 for layer in file_layers:
                     if layer not in layer_order:
                         results.append((table_name, layer))
@@ -177,7 +177,7 @@ class BuildMap(object):
         self.build_map()
         self.log.info(
             "Layer IDs: %s",
-            ", ".join(sanitise_layer(layer[1]) for layer in self.get_source_layers()),
+            ", ".join(sorted(sanitise_layer(layer[1]) for layer in self.get_source_layers())),
         )
         for table, attrs in self.known_attributes.items():
             self.log.info("Known attributes for %s: %s", table, ", ".join(attrs))
