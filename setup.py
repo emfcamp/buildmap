@@ -28,7 +28,6 @@ setup(
         "shapely",
         "pyyaml",
         "argparse",
-        "pyhcl",
         "psycopg2",
         "toml"
     ],
