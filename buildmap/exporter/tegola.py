@@ -33,7 +33,7 @@ class TegolaExporter(Exporter):
             geometry type in this case.
         """
         source = self.buildmap.get_source_layers()
-        for table_name, layer_name in source:
+        for table_name, layer_name in sorted(source, key=lambda k: k[1]):
             # the get_layer_type function will return all the component types of a GeometryCollection.
             # We can handle those in get_layer_sql
             types = self.db.get_layer_type(table_name, layer_name)
