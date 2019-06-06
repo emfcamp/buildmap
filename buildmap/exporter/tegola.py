@@ -61,7 +61,7 @@ class TegolaExporter(Exporter):
             "host": self.db.url.host,
             "port": self.db.url.port,
             "user": self.db.url.username,
-            "password": self.db.url.password,
+            "password": self.db.url.password or "",
             "srid": self.SRID,
             "max_connections": 20,
             "layers": [],
