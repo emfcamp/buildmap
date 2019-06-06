@@ -93,6 +93,9 @@ class BuildMap(object):
             subprocess.check_call(
                 [
                     "ogr2ogr",
+                    "--config",
+                    "DXF_ENCODING",
+                    "UTF-8",
                     "-s_srs",
                     self.config["source_projection"],
                     "-t_srs",
