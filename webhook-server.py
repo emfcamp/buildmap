@@ -1,6 +1,4 @@
-# coding=utf-8
 """An example github webhook server to update the map. This will need tweaking for your needs. """
-from __future__ import division, absolute_import, print_function, unicode_literals
 import os
 import threading
 import subprocess

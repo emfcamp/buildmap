@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import toml
 import re
 from os import path

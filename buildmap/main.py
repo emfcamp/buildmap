@@ -1,6 +1,3 @@
-# coding=utf-8
-from __future__ import division, absolute_import, print_function, unicode_literals
-
 import json
 import sys
 import logging
@@ -177,7 +174,9 @@ class BuildMap(object):
         self.build_map()
         self.log.info(
             "Layer IDs: %s",
-            ", ".join(sorted(sanitise_layer(layer[1]) for layer in self.get_source_layers())),
+            ", ".join(
+                sorted(sanitise_layer(layer[1]) for layer in self.get_source_layers())
+            ),
         )
         for table, attrs in self.known_attributes.items():
             self.log.info("Known attributes for %s: %s", table, ", ".join(attrs))
