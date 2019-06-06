@@ -101,7 +101,7 @@ class TegolaExporter(Exporter):
                 "name": "bounding_box",
                 "sql": """SELECT id AS gid, ST_AsBinary(ST_Transform(wkb_geometry, 3857)) AS geom
                         FROM bounding_box
-                        WHERE ST_Transform(wkb_geometry, 3857) && !BBOX!
+                        WHERE wkb_geometry && !BBOX!
                    """,
             }
         )
@@ -182,14 +182,13 @@ class TegolaExporter(Exporter):
                          %s
                   FROM %s
                   WHERE layer = '%s'
-                  AND ST_Transform(wkb_geometry, %s) && !BBOX! """ % (
+                  AND wkb_geometry && !BBOX! """ % (
             fid_field,
             geom_field,
             self.SRID,
             ", ".join(additional_fields),
             table_name,
             layer_name,
-            self.SRID,
         )
 
         # Filter the result by the type of geometry we're looking for, taking into account MultiGeometries.
