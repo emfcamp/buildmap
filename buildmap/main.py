@@ -5,6 +5,7 @@ import json
 import sys
 import logging
 import os
+import errno
 import shutil
 import subprocess
 import time
@@ -69,7 +70,7 @@ class BuildMap(object):
         try:
             os.makedirs(self.temp_dir)
         except OSError as e:
-            if e.errno != os.errno.EEXIST:
+            if e.errno != errno.EEXIST:
                 raise
 
     def load_config(self, config_files):
