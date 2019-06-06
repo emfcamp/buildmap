@@ -5,6 +5,10 @@ from ..util import sanitise_layer
 from . import Exporter
 
 
+def strip_srid(srid):
+    return int(srid.replace("epsg:", ""))
+
+
 class TegolaExporter(Exporter):
     """ Generate config for Tegola, which is a Mapbox Vector Tiles server.
 
@@ -99,10 +103,14 @@ class TegolaExporter(Exporter):
         provider["layers"].append(
             {
                 "name": "bounding_box",
-                "sql": """SELECT id AS gid, ST_AsBinary(ST_Transform(wkb_geometry, 3857)) AS geom
+                "sql": """SELECT id AS gid,
+                        ST_AsBinary(ST_Transform(wkb_geometry, {out_proj})) AS geom
                         FROM bounding_box
-                        WHERE wkb_geometry && !BBOX!
-                   """,
+                        WHERE wkb_geometry && ST_Transform(!BBOX!, {db_proj})
+                   """.format(
+                    out_proj=self.SRID,
+                    db_proj=strip_srid(self.config["source_projection"]),
+                ),
             }
         )
 
@@ -182,13 +190,14 @@ class TegolaExporter(Exporter):
                          %s
                   FROM %s
                   WHERE layer = '%s'
-                  AND wkb_geometry && !BBOX! """ % (
+                  AND wkb_geometry && ST_Transform(!BBOX!, %s) """ % (
             fid_field,
             geom_field,
             self.SRID,
             ", ".join(additional_fields),
             table_name,
             layer_name,
+            strip_srid(self.config["source_projection"]),
         )
 
         # Filter the result by the type of geometry we're looking for, taking into account MultiGeometries.
