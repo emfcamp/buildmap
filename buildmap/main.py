@@ -152,7 +152,7 @@ class BuildMap(object):
             bboxes = []
             for table_name in self.config["source_file"].keys():
                 bboxes.append(self.db.get_bounds(table_name))
-            self.bbox = MultiPolygon(bboxes)
+            self.bbox = MultiPolygon(bboxes).envelope
         return self.bbox
 
     def get_center(self):
