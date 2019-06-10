@@ -29,7 +29,8 @@ setup(
         "pyyaml",
         "argparse",
         "psycopg2",
-        "toml"
+        "toml",
+        "pydotplus"
     ],
     entry_points={"console_scripts": {"buildmap=buildmap.main:run"}},
 )
