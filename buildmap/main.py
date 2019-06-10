@@ -8,6 +8,7 @@ import subprocess
 import time
 import argparse
 import importlib
+from json.decoder import JSONDecodeError
 from collections import defaultdict
 from shapely.geometry import MultiPolygon, Polygon
 
@@ -73,8 +74,11 @@ class BuildMap(object):
     def load_config(self, config_files):
         config = {}
         for filename in config_files:
-            with open(filename, "r") as fp:
-                config.update(json.load(fp))
+            try:
+                with open(filename, "r") as fp:
+                    config.update(json.load(fp))
+            except JSONDecodeError as e:
+                raise Exception("Error loading config file {}: {}".format(filename, e))
         return config
 
     def resolve_path(self, path):
