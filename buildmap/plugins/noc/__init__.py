@@ -117,7 +117,7 @@ class NocPlugin(object):
             ),
             layer=self.switch_layer,
         ):
-            if "switch" in row:
+            if "switch" in row and row["switch"] is not None:
                 name = row["switch"]
             else:
                 self._warning(
@@ -247,7 +247,6 @@ class NocPlugin(object):
         # Physical links have already been ordered by this point so that "from_switch" is the core end.
         for link in self.links:
             if link.to_switch == switch_name:
-                # print("Uplink from %s is to %s" % (switch_name, link.from_switch))
 
                 # If we're extending:
                 if logical_link.type is not None:
@@ -274,8 +273,6 @@ class NocPlugin(object):
                 logical_link.type = link.type
                 logical_link.total_length += link.length
                 logical_link.couplers += 1
-                # print("Extend back from %s to %s, type %s, length now %d with %d couplers" %
-                #       (logical_link.to_switch, link.from_switch, logical_link.type, logical_link.total_length, logical_link.couplers))
 
                 # If it's fibre, we can try to continue extending
                 if logical_link.type == "fibre":
