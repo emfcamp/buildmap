@@ -130,14 +130,16 @@ class NocPlugin(object):
     def _find_switch_from_link(
         self, edge_entityhandle, edge_layer, edge_ogc_fid, start_or_end
     ):
+        col = "COALESCE(switch.switch, switch.entityhandle)"
         if "switch" not in self.table_columns:
-            return None
+            col = "switch.entityhandle"
 
         node_sql = self._sql(
-            """SELECT switch.switch AS switch
+            "SELECT " + col + """ AS switch
                             FROM {table} AS edge, {table} AS switch
                             WHERE edge.ogc_fid=:edge_ogc_fid
                             AND switch.layer = ANY(:switch_layers)
+                            AND ST_GeometryType(switch.wkb_geometry) = 'ST_Point'
                             AND ST_Buffer(switch.wkb_geometry, :buf) && ST_"""
             + start_or_end.title()
             + """Point(edge.wkb_geometry)
@@ -195,10 +197,10 @@ class NocPlugin(object):
 
             type = self.link_layers[row["layer"]]
             length = row["length"]
-            if row["updowns"] is not None:
+            if "updowns" in row and row["updowns"] is not None:
                 length += int(row["updowns"]) * self.UPDOWN_LENGTH
 
-            if row["cores"]:
+            if "cores" in row and row["cores"]:
                 cores = int(row["cores"])
             else:
                 self._warning(
@@ -208,6 +210,7 @@ class NocPlugin(object):
                 cores = 1
 
             yield Link(from_switch, to_switch, type, length, cores)
+
 
     def order_links_from_switch(self, switch_name):
         if switch_name in self.processed_switches:
@@ -359,10 +362,11 @@ class NocPlugin(object):
         open = ""
         close = ""
         label = "<"
-        if link.type == self.opts.get("fibre_layer", "fibre"):
+
+        if link.type == self.opts.get("fibre_layer", "fibre").lower():
             label += "{} cores".format(link.cores)
             colour = self.COLOUR_FIBRE
-        elif link.type == self.opts.get("copper_layer", "copper"):
+        elif link.type == self.opts.get("copper_layer", "copper").lower():
             length = float(link.length)
             if link.cores and int(link.cores) > 1:
                 label += "<b>{}x</b> ".format(link.cores)
@@ -396,7 +400,7 @@ class NocPlugin(object):
         label = "<"
         label += "{}m".format(str(logical_link.total_length)) + " " + logical_link.type
 
-        if logical_link.type == self.opts.get("fibre_layer", "fibre"):
+        if logical_link.type == self.opts.get("fibre_layer", "fibre").lower():
             if logical_link.couplers == 0:
                 label += " (direct)"
             else:
@@ -404,7 +408,7 @@ class NocPlugin(object):
                     logical_link.couplers, "" if logical_link.couplers == 1 else "s"
                 )
             colour = self.COLOUR_FIBRE
-        elif logical_link.type == self.opts.get("copper_layer", "copper"):
+        elif logical_link.type == self.opts.get("copper_layer", "copper").lower():
             # length = float(logical_link.length)
             # if logical_link.cores and int(logical_link.cores) > 1:
             #     label += '<b>{}x</b> '.format(logical_link.cores)
@@ -513,12 +517,12 @@ class NocPlugin(object):
         copper_count = fibre_count = fibre_cores = 0
         copper_length = fibre_length = fibre_core_length = 0
         for link in self.links:
-            if link.type == self.opts.get("fibre_layer", "fibre"):
+            if link.type == self.opts.get("fibre_layer", "fibre").lower():
                 fibre_count += 1
                 fibre_length += link.length
                 fibre_cores += link.cores
                 fibre_core_length += link.length * link.cores
-            elif link.type == self.opts.get("copper_layer", "copper"):
+            elif link.type == self.opts.get("copper_layer", "copper").lower():
                 copper_count += link.cores
                 copper_length += link.length
         stats_file.write("Number of physical links: %d\n" % (len(self.links)))
@@ -535,11 +539,11 @@ class NocPlugin(object):
         copper_length = fibre_length = 0
         couplers = 0
         for logical_link in self.logical_links:
-            if logical_link.type == self.opts.get("fibre_layer", "fibre"):
+            if logical_link.type == self.opts.get("fibre_layer", "fibre").lower():
                 fibre_count += 1
                 fibre_length += logical_link.total_length
                 couplers += logical_link.couplers
-            elif logical_link.type == self.opts.get("copper_layer", "copper"):
+            elif logical_link.type == self.opts.get("copper_layer", "copper").lower():
                 copper_count += 1
                 copper_length += logical_link.total_length
         stats_file.write("Number of logical links: %d\n" % (len(self.logical_links)))
