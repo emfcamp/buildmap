@@ -231,5 +231,16 @@ class MapDB(object):
         res = self.conn.execute(text("SELECT DISTINCT layer FROM %s" % table_name))
         return [row[0] for row in res]
 
+    def get_columns(self, table_name):
+        """ Return a list of columns for the given table """
+        result = self.conn.execute(
+            text(
+                """SELECT column_name FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = :table"""
+            ),
+            table=table_name,
+        )
+        return [row[0] for row in result]
+
     def execute(self, query, *args, **kwargs):
         return self.conn.execute(query, *args, **kwargs)

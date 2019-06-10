@@ -61,59 +61,81 @@ class NocPlugin(object):
         self.processed_switches = set()
         self.logical_links = []
         self.warnings = []
+        self.table = self.opts.get("table", "site_plan")
+        self.table_columns = set(self.db.get_columns(self.table))
 
     def generate_layers_config(self):
         " Detect NOC layers in map. "
+        self.log.info("Looking for NOC layers in table {}...".format(self.table))
         prefix = self.opts["layer_prefix"]
         layers = list(
             self.db.execute(
-                text(
-                    "SELECT DISTINCT layer FROM site_plan WHERE layer LIKE '%s%%'"
-                    % prefix
-                )
+                self._sql(
+                    "SELECT DISTINCT layer FROM {table} WHERE layer LIKE :prefix"
+                ),
+                prefix=prefix + "%",
             )
         )
 
         for layer in layers:
-            name_sub = layer[0][len(prefix) :]  # De-prefix the layer name
+            name_sub = layer[0][len(prefix) :].strip()  # De-prefix the layer name
 
-            if name_sub.lower() == "switch":
+            if name_sub.lower() == self.opts.get("switch_layer", "switch").lower():
                 self.switch_layer = layer[0]
-            elif name_sub.lower() in ["copper", "fibre"]:
+            elif name_sub.lower() in [
+                self.opts.get("copper_layer", "copper").lower(),
+                self.opts.get("fibre_layer", "fibre").lower(),
+            ]:
                 self.link_layers[layer[0]] = name_sub.lower()
 
-        if self.switch_layer and len(self.link_layers) > 0:
-            return True
-        else:
-            self.log.error(
-                "Unable to locate all required NOC layers. Layers discovered: %s"
-                % layers
-            )
+        if self.switch_layer is None:
+            self.log.error("Unable to locate switch layer")
             return False
+
+        if len(self.link_layers) == 0:
+            self.log.error("Unable to locate any link layers")
+            return False
+
+        return True
 
     def _warning(self, msg):
         self.log.warning(msg)
         self.warnings.append(msg)
 
+    def _sql(self, sql, cols=None):
+        if cols:
+            cols = ", ".join(set(cols) & self.table_columns)
+        return text(sql.format(table=self.table, columns=cols))
+
     def get_switches(self):
         self.log.info("Loading switches")
         for row in self.db.execute(
-            text("SELECT * FROM site_plan WHERE layer = :layer"),
+            self._sql(
+                """SELECT * FROM {table}
+                    WHERE layer = :layer
+                    AND ST_GeometryType(wkb_geometry) = 'ST_Point'"""
+            ),
             layer=self.switch_layer,
         ):
-            if "switch" not in row or row["switch"] is None:
+            if "switch" in row:
+                name = row["switch"]
+            else:
                 self._warning(
                     "Switch name not found in entity 0x%s on %s layer"
                     % (row["entityhandle"], self.switch_layer)
                 )
-            yield Switch(row["switch"])
+                name = row["entityhandle"]
+            yield Switch(name)
 
     def _find_switch_from_link(
         self, edge_entityhandle, edge_layer, edge_ogc_fid, start_or_end
     ):
-        node_sql = text(
+        if "switch" not in self.table_columns:
+            return None
+
+        node_sql = self._sql(
             """SELECT switch.switch AS switch
-                            FROM site_plan AS edge, site_plan AS switch
+                            FROM {table} AS edge, {table} AS switch
                             WHERE edge.ogc_fid=:edge_ogc_fid
                             AND switch.layer = ANY(:switch_layers)
                             AND ST_Buffer(switch.wkb_geometry, :buf) && ST_"""
@@ -147,17 +169,17 @@ class NocPlugin(object):
         """ Returns all the links """
         self.log.info("Loading links")
 
-        sql = text(
+        sql = self._sql(
             """SELECT layer,
                             round(ST_Length(wkb_geometry)::NUMERIC, 1) AS length,
-                            cores,
-                            updowns,
+                            {columns},
                             entityhandle,
                             ogc_fid
-                        FROM site_plan
+                        FROM {table}
                         WHERE layer = ANY(:link_layers)
                         AND ST_GeometryType(wkb_geometry) = 'ST_LineString'
-                    """
+                    """,
+            cols=["cores", "updowns"],
         )
         for row in self.db.execute(sql, link_layers=list(self.link_layers.keys())):
             from_switch = self._find_switch_from_link(
@@ -269,7 +291,15 @@ class NocPlugin(object):
             self.links.append(link)
 
         # Order links so that they go away from the core
-        root_switch = self.switches[self.opts.get("core")]
+        if self.opts.get("core") and self.opts["core"] in self.switches:
+            root_switch = self.switches[self.opts.get("core")]
+        else:
+            self._warning(
+                "Specified core switch %s does not exist. Using first available switch as root."
+                % self.opts.get("core")
+            )
+            root_switch = list(self.switches.values())[0]
+
         self.processed_switches = set()
         self.processed_links = set()
         self.order_links_from_switch(root_switch.name)
@@ -298,8 +328,8 @@ class NocPlugin(object):
                 logical_link = LogicalLink(None, switch_name, None, 0, -1)
                 self._make_logical_link(switch_name, logical_link)
                 if logical_link.type is None:
-                    self.log.error("Unable to trace logical uplink for %s", switch_name)
-                    return False
+                    self._warning("Unable to trace logical uplink for %s" % switch_name)
+                    continue
 
                 self.logical_links.append(logical_link)
 
@@ -332,10 +362,10 @@ class NocPlugin(object):
         open = ""
         close = ""
         label = "<"
-        if link.type == "fibre":
+        if link.type == self.opts.get("fibre_layer", "fibre"):
             label += "{} cores".format(link.cores)
             colour = self.COLOUR_FIBRE
-        elif link.type == "copper":
+        elif link.type == self.opts.get("copper_layer", "copper"):
             length = float(link.length)
             if link.cores and int(link.cores) > 1:
                 label += "<b>{}x</b> ".format(link.cores)
@@ -369,7 +399,7 @@ class NocPlugin(object):
         label = "<"
         label += "{}m".format(str(logical_link.total_length)) + " " + logical_link.type
 
-        if logical_link.type == "fibre":
+        if logical_link.type == self.opts.get("fibre_layer", "fibre"):
             if logical_link.couplers == 0:
                 label += " (direct)"
             else:
@@ -377,7 +407,7 @@ class NocPlugin(object):
                     logical_link.couplers, "" if logical_link.couplers == 1 else "s"
                 )
             colour = self.COLOUR_FIBRE
-        elif logical_link.type == "copper":
+        elif logical_link.type == self.opts.get("copper_layer", "copper"):
             # length = float(logical_link.length)
             # if logical_link.cores and int(logical_link.cores) > 1:
             #     label += '<b>{}x</b> '.format(logical_link.cores)
@@ -475,7 +505,7 @@ class NocPlugin(object):
         return dot
 
     def get_link_medium(self, link):
-        if link.type == "copper":
+        if link.type == self.opts.get("copper_layer", "copper"):
             length = float(link.length)
             if length <= self.LENGTH_COPPER_NOT_CCA:
                 return "CCA"
@@ -486,12 +516,12 @@ class NocPlugin(object):
         copper_count = fibre_count = fibre_cores = 0
         copper_length = fibre_length = fibre_core_length = 0
         for link in self.links:
-            if link.type == "fibre":
+            if link.type == self.opts.get("fibre_layer", "fibre"):
                 fibre_count += 1
                 fibre_length += link.length
                 fibre_cores += link.cores
                 fibre_core_length += link.length * link.cores
-            elif link.type == "copper":
+            elif link.type == self.opts.get("copper_layer", "copper"):
                 copper_count += link.cores
                 copper_length += link.length
         stats_file.write("Number of physical links: %d\n" % (len(self.links)))
@@ -508,11 +538,11 @@ class NocPlugin(object):
         copper_length = fibre_length = 0
         couplers = 0
         for logical_link in self.logical_links:
-            if logical_link.type == "fibre":
+            if logical_link.type == self.opts.get("fibre_layer", "fibre"):
                 fibre_count += 1
                 fibre_length += logical_link.total_length
                 couplers += logical_link.couplers
-            elif logical_link.type == "copper":
+            elif logical_link.type == self.opts.get("copper_layer", "copper"):
                 copper_count += 1
                 copper_length += logical_link.total_length
         stats_file.write("Number of logical links: %d\n" % (len(self.logical_links)))
