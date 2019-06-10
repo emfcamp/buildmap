@@ -279,7 +279,7 @@ class NocPlugin(object):
                 logical_link.couplers += 1
 
                 # If it's fibre, we can try to continue extending
-                if logical_link.type == "fibre":
+                if logical_link.type == self.opts.get("fibre_layer", "fibre").lower():
                     self._make_logical_link(link.from_switch, logical_link)
 
                 return
