@@ -135,7 +135,9 @@ class NocPlugin(object):
             col = "switch.entityhandle"
 
         node_sql = self._sql(
-            "SELECT " + col + """ AS switch
+            "SELECT "
+            + col
+            + """ AS switch
                             FROM {table} AS edge, {table} AS switch
                             WHERE edge.ogc_fid=:edge_ogc_fid
                             AND switch.layer = ANY(:switch_layers)
@@ -210,7 +212,6 @@ class NocPlugin(object):
                 cores = 1
 
             yield Link(from_switch, to_switch, type, length, cores)
-
 
     def order_links_from_switch(self, switch_name):
         if switch_name in self.processed_switches:
@@ -364,7 +365,7 @@ class NocPlugin(object):
         label = "<"
 
         if link.type == self.opts.get("fibre_layer", "fibre").lower():
-            label += "{} cores".format(link.cores)
+            label += str(link.cores) + " " + ("cores" if link.cores > 1 else "core")
             colour = self.COLOUR_FIBRE
         elif link.type == self.opts.get("copper_layer", "copper").lower():
             length = float(link.length)
