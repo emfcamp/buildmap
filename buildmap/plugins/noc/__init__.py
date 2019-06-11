@@ -17,6 +17,7 @@ class Link:
         self.type = type
         self.length = length
         self.cores = cores
+        self.cores_used = 0
 
 
 class LogicalLink:
@@ -235,13 +236,17 @@ class NocPlugin(object):
     def _validate_child_link_cores(self, switch_name):
         cores = 1  # One for the local fibre-served switch
         for link in self.links:
-            if link.type == "fibre" and link.from_switch == switch_name:
+            if (
+                link.type == self.opts.get("fibre_layer", "fibre").lower()
+                and link.from_switch == switch_name
+            ):
                 child_switch_cores = self._validate_child_link_cores(link.to_switch)
-                if link.cores != child_switch_cores:
+                if link.cores < child_switch_cores:
                     self._warning(
-                        "Link from %s to %s requires %d cores but has %d"
+                        "Link from %s to %s requires %d cores but only has %d"
                         % (switch_name, link.to_switch, child_switch_cores, link.cores)
                     )
+                link.cores_used = child_switch_cores
                 cores += child_switch_cores
 
         return cores
@@ -365,6 +370,8 @@ class NocPlugin(object):
         label = "<"
 
         if link.type == self.opts.get("fibre_layer", "fibre").lower():
+            if link.cores_used != link.cores:
+                label += str(link.cores_used) + "/"
             label += str(link.cores) + " " + ("cores" if link.cores > 1 else "core")
             colour = self.COLOUR_FIBRE
         elif link.type == self.opts.get("copper_layer", "copper").lower():
