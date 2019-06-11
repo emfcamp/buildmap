@@ -12,8 +12,8 @@ Switch = namedtuple("Switch", ["name"])
 
 
 class LinkType(Enum):
-    Copper = 'copper'
-    Fibre = 'fibre'
+    Copper = "copper"
+    Fibre = "fibre"
 
 
 class Link:
@@ -241,10 +241,7 @@ class NocPlugin(object):
     def _validate_child_link_cores(self, switch_name):
         cores = 1  # One for the local fibre-served switch
         for link in self.links:
-            if (
-                link.type == LinkType.Fibre
-                and link.from_switch == switch_name
-            ):
+            if link.type == LinkType.Fibre and link.from_switch == switch_name:
                 child_switch_cores = self._validate_child_link_cores(link.to_switch)
                 if link.cores < child_switch_cores:
                     self._warning(
@@ -408,7 +405,9 @@ class NocPlugin(object):
         # open = ''
         # close = ''
         label = "<"
-        label += "{}m".format(str(logical_link.total_length)) + " " + logical_link.type.value
+        label += (
+            "{}m".format(str(logical_link.total_length)) + " " + logical_link.type.value
+        )
 
         if logical_link.type == LinkType.Fibre:
             if logical_link.couplers == 0:
