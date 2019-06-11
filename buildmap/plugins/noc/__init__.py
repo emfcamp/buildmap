@@ -51,9 +51,9 @@ class LogicalLink:
         if self.type == LinkType.Copper:
             raise ValueError("Can't calculate link loss for copper!")
 
-        COUPLER_LOSS = 1.5  # dB
-        FIBRE_LOSS = 1  # dB/km
-        CONNECTOR_LOSS = 0.5  # dB
+        COUPLER_LOSS = 0.2  # dB
+        FIBRE_LOSS = 0.5  # dB/km
+        CONNECTOR_LOSS = 0.1  # dB
 
         return (
             self.couplers * COUPLER_LOSS
