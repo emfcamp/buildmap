@@ -81,6 +81,7 @@ class TegolaExporter(Exporter):
             "center": self.buildmap.get_center()
             + [float(self.config["zoom_range"][0])],
             "layers": [],
+            "attribution": 'Powered by <a href="https://github.com/emfcamp/buildmap">buildmap</a>.',
         }
 
         if (
