@@ -17,19 +17,18 @@ class LinkType(Enum):
 
 
 class Link:
-    def __init__(self, from_switch, to_switch, type, length, cores):
+    def __init__(self, from_switch, to_switch, type, length, cores, aggregated):
         self.from_switch = from_switch
         self.to_switch = to_switch
         self.type = type
         self.length = length
         self.cores = cores
         self.cores_used = 0
+        self.aggregated = aggregated
 
     def __repr__(self):
         return "<Link {from_switch} -> {to_switch} ({type})>".format(
-            from_switch=self.from_switch,
-            to_switch=self.to_switch,
-            type=self.type.value
+            from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
         )
 
 
@@ -38,6 +37,7 @@ class LogicalLink:
         Logical links can span more than one physical cable when the link is passively
         patched/coupled through an intermediate location.
     """
+
     def __init__(self, from_switch, to_switch, type, total_length, couplers):
         self.from_switch = from_switch
         self.to_switch = to_switch
@@ -47,9 +47,7 @@ class LogicalLink:
 
     def __repr__(self):
         return "<LogicalLink {from_switch} -> {to_switch} ({type})>".format(
-            from_switch=self.from_switch,
-            to_switch=self.to_switch,
-            type=self.type.value
+            from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
         )
 
 
@@ -207,7 +205,7 @@ class NocPlugin(object):
                         WHERE layer = ANY(:link_layers)
                         AND ST_GeometryType(wkb_geometry) = 'ST_LineString'
                     """,
-            cols=["cores", "updowns"],
+            cols=["cores", "updowns", "aggregated"],
         )
         for row in self.db.execute(sql, link_layers=list(self.link_layers.keys())):
             from_switch = self._find_switch_from_link(
@@ -235,7 +233,11 @@ class NocPlugin(object):
                 )
                 cores = 1
 
-            yield Link(from_switch, to_switch, type, length, cores)
+            aggregated = False
+            if "aggregated" in row and row["aggregated"] is not None:
+                aggregated = True
+
+            yield Link(from_switch, to_switch, type, length, cores, aggregated)
 
     def order_links_from_switch(self, switch_name):
         if switch_name in self.processed_switches:
@@ -260,13 +262,20 @@ class NocPlugin(object):
         cores = 1  # One for the local fibre-served switch
         for link in self.links:
             if link.type == LinkType.Fibre and link.from_switch == switch_name:
-                child_switch_cores = self._validate_child_link_cores(link.to_switch)
+                if link.aggregated:
+                    # This link is aggregated so there's only one downstream core
+                    child_switch_cores = 0
+                    link.cores_used = 1
+                else:
+                    # Count the cores for all switches below this node in the tree
+                    child_switch_cores = self._validate_child_link_cores(link.to_switch)
+                    link.cores_used = child_switch_cores
+
                 if link.cores < child_switch_cores:
                     self._warning(
                         "Link from %s to %s requires %d cores but only has %d"
                         % (switch_name, link.to_switch, child_switch_cores, link.cores)
                     )
-                link.cores_used = child_switch_cores
                 cores += child_switch_cores
 
         return cores
@@ -276,7 +285,6 @@ class NocPlugin(object):
         # Physical links have already been ordered by this point so that "from_switch" is the core end.
         for link in self.links:
             if link.to_switch == switch_name:
-
                 # If we're extending:
                 if logical_link.type is not None:
 
@@ -300,8 +308,9 @@ class NocPlugin(object):
                 logical_link.total_length += link.length
                 logical_link.couplers += 1
 
-                # If it's fibre, we can try to continue extending
-                if logical_link.type == LinkType.Fibre:
+                # If it's fibre, and the "aggregated" attribute isn't set, we try to
+                # extend the logical link
+                if logical_link.type == LinkType.Fibre and not link.aggregated:
                     self._make_logical_link(link.from_switch, logical_link)
 
                 return
@@ -390,6 +399,8 @@ class NocPlugin(object):
             if link.cores_used != link.cores:
                 label += str(link.cores_used) + "/"
             label += str(link.cores) + " " + ("cores" if link.cores > 1 else "core")
+            if link.aggregated:
+                label += "<br/>(aggregated)"
             colour = self.COLOUR_FIBRE
         elif link.type == LinkType.Copper:
             length = float(link.length)
