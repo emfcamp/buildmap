@@ -45,6 +45,22 @@ class LogicalLink:
         self.total_length = total_length
         self.couplers = couplers
 
+    def loss(self):
+        """ Return an approximation of loss in dB """
+
+        if self.type == LinkType.Copper:
+            raise ValueError("Can't calculate link loss for copper!")
+
+        COUPLER_LOSS = 1.5  # dB
+        FIBRE_LOSS = 1  # dB/km
+        CONNECTOR_LOSS = 0.5  # dB
+
+        return (
+            self.couplers * COUPLER_LOSS
+            + (float(self.total_length) / 1000) * FIBRE_LOSS
+            + 2 * CONNECTOR_LOSS
+        )
+
     def __repr__(self):
         return "<LogicalLink {from_switch} -> {to_switch} ({type})>".format(
             from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
@@ -229,7 +245,7 @@ class NocPlugin(object):
             else:
                 self._warning(
                     "%s link from %s to %s had no cores, assuming 1"
-                    % (type.title(), from_switch, to_switch)
+                    % (type.value.title(), from_switch, to_switch)
                 )
                 cores = 1
 
@@ -445,6 +461,7 @@ class NocPlugin(object):
                 label += " ({} coupler{})".format(
                     logical_link.couplers, "" if logical_link.couplers == 1 else "s"
                 )
+            label += " {:.2f} dB".format(logical_link.loss())
             colour = self.COLOUR_FIBRE
         elif logical_link.type == LinkType.Copper:
             # length = float(logical_link.length)
