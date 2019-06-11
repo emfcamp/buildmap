@@ -1,6 +1,7 @@
 import logging
 import time
 from collections import namedtuple
+from enum import Enum
 import os.path
 import pydotplus as pydot  # type: ignore
 import csv
@@ -8,6 +9,11 @@ from sqlalchemy.sql import text
 from datetime import date
 
 Switch = namedtuple("Switch", ["name"])
+
+
+class LinkType(Enum):
+    Copper = 'copper'
+    Fibre = 'fibre'
 
 
 class Link:
@@ -83,11 +89,10 @@ class NocPlugin(object):
 
             if name_sub.lower() == self.opts.get("switch_layer", "switch").lower():
                 self.switch_layer = layer[0]
-            elif name_sub.lower() in [
-                self.opts.get("copper_layer", "copper").lower(),
-                self.opts.get("fibre_layer", "fibre").lower(),
-            ]:
-                self.link_layers[layer[0]] = name_sub.lower()
+            elif name_sub.lower() == self.opts.get("copper_layer", "copper").lower():
+                self.link_layers[layer[0]] = LinkType.Copper
+            elif name_sub.lower() == self.opts.get("fibre_layer", "fibre").lower():
+                self.link_layers[layer[0]] = LinkType.Fibre
 
         if self.switch_layer is None:
             self.log.error("Unable to locate switch layer")
@@ -237,7 +242,7 @@ class NocPlugin(object):
         cores = 1  # One for the local fibre-served switch
         for link in self.links:
             if (
-                link.type == self.opts.get("fibre_layer", "fibre").lower()
+                link.type == LinkType.Fibre
                 and link.from_switch == switch_name
             ):
                 child_switch_cores = self._validate_child_link_cores(link.to_switch)
@@ -259,9 +264,6 @@ class NocPlugin(object):
 
                 # If we're extending:
                 if logical_link.type is not None:
-                    # If it's copper and it's not our first link, we're done, we can't extend any further.
-                    # if link.type == 'copper' and :
-                    #     return
 
                     # We can't extend to a different medium
                     if link.type != logical_link.type:
@@ -284,7 +286,7 @@ class NocPlugin(object):
                 logical_link.couplers += 1
 
                 # If it's fibre, we can try to continue extending
-                if logical_link.type == self.opts.get("fibre_layer", "fibre").lower():
+                if logical_link.type == LinkType.Fibre:
                     self._make_logical_link(link.from_switch, logical_link)
 
                 return
@@ -369,12 +371,12 @@ class NocPlugin(object):
         close = ""
         label = "<"
 
-        if link.type == self.opts.get("fibre_layer", "fibre").lower():
+        if link.type == LinkType.Fibre:
             if link.cores_used != link.cores:
                 label += str(link.cores_used) + "/"
             label += str(link.cores) + " " + ("cores" if link.cores > 1 else "core")
             colour = self.COLOUR_FIBRE
-        elif link.type == self.opts.get("copper_layer", "copper").lower():
+        elif link.type == LinkType.Copper:
             length = float(link.length)
             if link.cores and int(link.cores) > 1:
                 label += "<b>{}x</b> ".format(link.cores)
@@ -406,9 +408,9 @@ class NocPlugin(object):
         # open = ''
         # close = ''
         label = "<"
-        label += "{}m".format(str(logical_link.total_length)) + " " + logical_link.type
+        label += "{}m".format(str(logical_link.total_length)) + " " + logical_link.type.value
 
-        if logical_link.type == self.opts.get("fibre_layer", "fibre").lower():
+        if logical_link.type == LinkType.Fibre:
             if logical_link.couplers == 0:
                 label += " (direct)"
             else:
@@ -416,7 +418,7 @@ class NocPlugin(object):
                     logical_link.couplers, "" if logical_link.couplers == 1 else "s"
                 )
             colour = self.COLOUR_FIBRE
-        elif logical_link.type == self.opts.get("copper_layer", "copper").lower():
+        elif logical_link.type == LinkType.Copper:
             # length = float(logical_link.length)
             # if logical_link.cores and int(logical_link.cores) > 1:
             #     label += '<b>{}x</b> '.format(logical_link.cores)
@@ -514,23 +516,23 @@ class NocPlugin(object):
         return dot
 
     def get_link_medium(self, link):
-        if link.type == self.opts.get("copper_layer", "copper"):
+        if link.type == LinkType.Copper:
             length = float(link.length)
             if length <= self.LENGTH_COPPER_NOT_CCA:
                 return "CCA"
-        return link.type.title()
+        return link.type.value.title()
 
     def _write_stats(self, stats_file):
         # Physical links
         copper_count = fibre_count = fibre_cores = 0
         copper_length = fibre_length = fibre_core_length = 0
         for link in self.links:
-            if link.type == self.opts.get("fibre_layer", "fibre").lower():
+            if link.type == LinkType.Fibre:
                 fibre_count += 1
                 fibre_length += link.length
                 fibre_cores += link.cores
                 fibre_core_length += link.length * link.cores
-            elif link.type == self.opts.get("copper_layer", "copper").lower():
+            elif link.type == LinkType.Copper:
                 copper_count += link.cores
                 copper_length += link.length
         stats_file.write("Number of physical links: %d\n" % (len(self.links)))
@@ -547,11 +549,11 @@ class NocPlugin(object):
         copper_length = fibre_length = 0
         couplers = 0
         for logical_link in self.logical_links:
-            if logical_link.type == self.opts.get("fibre_layer", "fibre").lower():
+            if logical_link.type == LinkType.Fibre:
                 fibre_count += 1
                 fibre_length += logical_link.total_length
                 couplers += logical_link.couplers
-            elif logical_link.type == self.opts.get("copper_layer", "copper").lower():
+            elif logical_link.type == LinkType.Copper:
                 copper_count += 1
                 copper_length += logical_link.total_length
         stats_file.write("Number of logical links: %d\n" % (len(self.logical_links)))
