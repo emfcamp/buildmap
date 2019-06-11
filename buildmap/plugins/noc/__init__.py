@@ -25,14 +25,32 @@ class Link:
         self.cores = cores
         self.cores_used = 0
 
+    def __repr__(self):
+        return "<Link {from_switch} -> {to_switch} ({type})>".format(
+            from_switch=self.from_switch,
+            to_switch=self.to_switch,
+            type=self.type.value
+        )
+
 
 class LogicalLink:
+    """ A logical link represents a direct network path between two switches.
+        Logical links can span more than one physical cable when the link is passively
+        patched/coupled through an intermediate location.
+    """
     def __init__(self, from_switch, to_switch, type, total_length, couplers):
         self.from_switch = from_switch
         self.to_switch = to_switch
         self.type = type
         self.total_length = total_length
         self.couplers = couplers
+
+    def __repr__(self):
+        return "<LogicalLink {from_switch} -> {to_switch} ({type})>".format(
+            from_switch=self.from_switch,
+            to_switch=self.to_switch,
+            type=self.type.value
+        )
 
 
 class NocPlugin(object):
