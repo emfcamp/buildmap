@@ -202,6 +202,10 @@ class MapDB(object):
                 text("CREATE INDEX %s_layer on %s(layer)" % (table_name, table_name))
             )
 
+        self.conn.execution_options(isolation_level="AUTOCOMMIT").execute(
+            text("VACUUM ANALYZE %s" % table_name)
+        )
+
     def prefix_handles(self, table_name, prefix):
         """ Prefix entity handles to avoid collisions with multiple DXF files. """
         with self.conn.begin():
