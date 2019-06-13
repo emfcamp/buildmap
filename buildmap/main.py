@@ -117,29 +117,30 @@ class BuildMap(object):
             sys.exit(1)
 
     def get_source_layers(self):
-        """ Get a list of source layers. Returns a list of (tablename, layername) tuples """
+        """ Get a list of source layers. Returns a list of (tablename, layername) tuples.
+
+            Each layer name should only appear once in the result, even if it's present in
+            multiple files.
+        """
         results = []
+        seen_layers = set()
         for table_name, source_file in self.config["source_file"].items():
             layer_order = source_file.get("layers", {})
             file_layers = self.db.get_layers(table_name)
-            layers_imported = 0
 
+            for layer in layer_order:
+                if layer in file_layers and layer not in seen_layers:
+                    seen_layers.add(layer)
+                    results.append((table_name, layer))
+
+        for table_name, source_file in self.config["source_file"].items():
             # If we're configured to auto-import layers, add layers without a
             # defined order to the bottom of the layer order stack
             if source_file.get("auto_import_layers", False):
                 for layer in file_layers:
-                    if layer not in layer_order:
-                        layers_imported += 1
-                        results.append((table_name, layer))
-
-            # Now add ordered layers on top of those
-            for layer in layer_order:
-                if layer in file_layers:
-                    layers_imported += 1
-                    results.append((table_name, layer))
-
-            if layers_imported == 0:
-                self.log.warn("No layers imported from source file %s!", source_file)
+                    if layer not in seen_layers:
+                        seen_layers.add(layer)
+                        results.insert(0, (table_name, layer))
 
         return results
 
