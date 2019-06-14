@@ -36,11 +36,14 @@ class TegolaExporter(Exporter):
             geometry type in this case.
         """
         source = self.buildmap.get_source_layers()
-        for table_name, layer_name in sorted(source, key=lambda k: k[1]):
+        seen = set()
+        for table_name, layer_name in reversed(source):
             # the get_layer_type function will return all the component types of a GeometryCollection.
             # We can handle those in get_layer_sql
             types = self.db.get_layer_type(table_name, layer_name)
             if len(types) == 1:
+                if sanitise_layer(layer_name) in seen:
+                    continue
                 yield (
                     table_name,
                     layer_name,
@@ -49,12 +52,15 @@ class TegolaExporter(Exporter):
             else:
                 # Multiple simple types. Split them into different layers.
                 for typ in types:
-                    type_alias = typ.lower().split("_")[1]
+                    layer_name = layer_name + "_" + typ.lower().split("_")[1]
+                    if sanitise_layer(layer_name) in seen:
+                        continue
                     yield (
                         table_name,
-                        layer_name + "_" + type_alias,
+                        layer_name,
                         self.get_layer_sql(table_name, layer_name, typ),
                     )
+            seen.add(sanitise_layer(layer_name))
 
     def generate_tegola_config(self):
         provider = {
