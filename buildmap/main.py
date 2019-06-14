@@ -134,6 +134,7 @@ class BuildMap(object):
                     results.append((table_name, layer))
 
         for table_name, source_file in self.config["source_file"].items():
+            file_layers = self.db.get_layers(table_name)
             # If we're configured to auto-import layers, add layers without a
             # defined order to the bottom of the layer order stack
             if source_file.get("auto_import_layers", False):
