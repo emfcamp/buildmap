@@ -214,20 +214,14 @@ class MapDB(object):
         """
         MATCH_REGEX = r"\\U\+([0-9a-f]{4})"
         result = self.conn.execute(
-            text(
-                "SELECT ogc_fid, text FROM {} WHERE text ~ :regex".format(
-                    table_name
-                )
-            ),
+            text("SELECT ogc_fid, text FROM {} WHERE text ~ :regex".format(table_name)),
             regex=MATCH_REGEX,
         )
         for row in result:
             cleaned_text = re.sub(MATCH_REGEX, lambda r: chr(int(r[1], 16)), row[1])
             self.conn.execute(
                 text(
-                    "UPDATE {} SET text = :text WHERE ogc_fid = :fid".format(
-                        table_name
-                    )
+                    "UPDATE {} SET text = :text WHERE ogc_fid = :fid".format(table_name)
                 ),
                 text=cleaned_text,
                 fid=row[0],
