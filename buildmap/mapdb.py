@@ -1,6 +1,7 @@
 from collections import defaultdict
 import logging
 import sqlalchemy
+import re
 from time import sleep
 from shapely import wkt
 from sqlalchemy.sql import text
@@ -201,10 +202,36 @@ class MapDB(object):
             self.conn.execute(
                 text("CREATE INDEX %s_layer on %s(layer)" % (table_name, table_name))
             )
+            self.clean_weird_unicode(table_name)
 
         self.conn.execution_options(isolation_level="AUTOCOMMIT").execute(
             text("VACUUM ANALYZE %s" % table_name)
         )
+
+    def clean_weird_unicode(self, table_name):
+        """ Sometimes text comes through as strange unicode in the format "\\U+00f6".
+            Probably AutoCAD's fault.
+        """
+        MATCH_REGEX = r"\\U\+([0-9a-f]{4})"
+        result = self.conn.execute(
+            text(
+                "SELECT ogc_fid, text FROM {} WHERE text ~ :regex".format(
+                    table_name
+                )
+            ),
+            regex=MATCH_REGEX,
+        )
+        for row in result:
+            cleaned_text = re.sub(MATCH_REGEX, lambda r: chr(int(r[1], 16)), row[1])
+            self.conn.execute(
+                text(
+                    "UPDATE {} SET text = :text WHERE ogc_fid = :fid".format(
+                        table_name
+                    )
+                ),
+                text=cleaned_text,
+                fid=row[0],
+            )
 
     def prefix_handles(self, table_name, prefix):
         """ Prefix entity handles to avoid collisions with multiple DXF files. """
