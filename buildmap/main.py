@@ -212,9 +212,15 @@ class BuildMap(object):
         # Do some data transformation on the PostGIS table
         self.log.info("Transforming data...")
         for table, tconfig in self.config["source_file"].items():
+            for layer in tconfig.get("combine_lines", []):
+                self.db.combine_lines(table, layer)
             self.db.clean_layers(table)
             if "handle_prefix" in tconfig:
                 self.db.prefix_handles(table, tconfig["handle_prefix"])
+            for layer in tconfig.get("force_polygon", []):
+                self.db.force_polygon(table, layer)
+            for layer in tconfig.get("smooth", []):
+                self.db.smooth(table, layer)
             self.known_attributes[table] |= self.db.extract_attributes(table)
 
         self.db.create_bounding_layer("bounding_box", self.get_bbox())

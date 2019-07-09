@@ -252,6 +252,72 @@ class MapDB(object):
             result = self.conn.execute(text(sql))
             return [row[0] for row in result]
 
+    def combine_lines(self, table_name, layer_name):
+        """ Given a layer which contains linestrings which *almost* comprise
+            polygons, try and combine them. """
+        sets = []
+        with self.conn.begin():
+            sql = """SELECT a.ogc_fid, b.ogc_fid FROM {table} a, {table} b
+                        WHERE (ST_Touches(a.wkb_geometry, b.wkb_geometry)
+                            OR ST_StartPoint(a.wkb_geometry) && ST_Buffer(ST_EndPoint(b.wkb_geometry), 1)
+                            OR ST_EndPoint(a.wkb_geometry) && ST_Buffer(ST_StartPoint(b.wkb_geometry), 1)
+                        )
+                        AND ST_GeometryType(a.wkb_geometry) = 'ST_LineString'
+                        AND ST_GeometryType(b.wkb_geometry) = 'ST_LineString'
+                        AND a.layer = '{layer}' and b.layer = '{layer}'
+                        ORDER BY a.ogc_fid ASC""".format(
+                table=table_name, layer=layer_name
+            )
+            # Generate a number of sets of linked entities
+            for res in self.conn.execute(text(sql)):
+                for s in sets:
+                    if res[0] in s or res[1] in s:
+                        s.add(res[0])
+                        s.add(res[1])
+                        break
+                else:
+                    sets.append({res[0], res[1]})
+
+            for s in sets:
+                if len(s) == 1:
+                    # This is a single line, skip it
+                    continue
+
+                # Merge the all geometries into the one with the lowest ID
+                dest = min(s)
+                sql = """UPDATE {table} SET wkb_geometry = (SELECT ST_LineMerge(ST_Union(wkb_geometry))
+                       FROM {table} WHERE ogc_fid IN :fids) WHERE ogc_fid = :dest""".format(
+                    table=table_name
+                )
+                self.conn.execute(text(sql), fids=tuple(s), dest=dest)
+                self.conn.execute(
+                    text(
+                        "DELETE FROM {table} WHERE ogc_fid IN :fids".format(
+                            table=table_name
+                        )
+                    ),
+                    fids=tuple(s - {dest}),
+                )
+
+    def force_polygon(self, table_name, layer_name):
+        """ Force all linestring objects in a layer to be polygons by
+            calculating their concave hull. Handy for dealing with messy CAD files. """
+        with self.conn.begin():
+            sql = """UPDATE {table} SET wkb_geometry = ST_ConcaveHull(wkb_geometry, 0.9)
+                        WHERE ST_Geometrytype(wkb_geometry) IN ('ST_LineString', 'ST_MultiLineString')
+                        AND layer = '{layer}'""".format(
+                table=table_name, layer=layer_name
+            )
+            self.conn.execute(text(sql))
+
+    def smooth(self, table_name, layer_name):
+        with self.conn.begin():
+            sql = """UPDATE {table} SET wkb_geometry = ST_ChaikinSmoothing(wkb_geometry, 1, true)
+                     WHERE layer = '{layer}'""".format(
+                table=table_name, layer=layer_name
+            )
+            self.conn.execute(text(sql))
+
     def get_layers(self, table_name):
         res = self.conn.execute(text("SELECT DISTINCT layer FROM %s" % table_name))
         return [row[0] for row in res]
