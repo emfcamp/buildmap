@@ -42,14 +42,15 @@ class TegolaExporter(Exporter):
             # We can handle those in get_layer_sql
             types = self.db.get_layer_type(table_name, layer_name)
             if len(types) == 1:
-                if sanitise_layer(layer_name) in seen:
+                layer_name_typ = layer_name + "_" + types[0].lower().split("_")[1]
+                if sanitise_layer(layer_name_typ) in seen:
                     continue
+                seen.add(sanitise_layer(layer_name_typ))
                 yield (
                     table_name,
-                    layer_name,
+                    layer_name_typ,
                     self.get_layer_sql(table_name, layer_name, types[0]),
                 )
-                seen.add(sanitise_layer(layer_name))
             else:
                 # Multiple simple types. Split them into different layers.
                 for typ in types:
