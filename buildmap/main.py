@@ -8,6 +8,7 @@ import subprocess
 import time
 import argparse
 import importlib
+import tempfile
 from json.decoder import JSONDecodeError
 from collections import defaultdict
 from shapely.geometry import MultiPolygon, Polygon
@@ -94,9 +95,9 @@ class BuildMap(object):
             subprocess.check_call(
                 [
                     "ogr2ogr",
-                    "--config",
-                    "DXF_ENCODING",
-                    "UTF-8",
+                    # "--config",
+                    # "DXF_ENCODING",
+                    # "UTF-8",
                     "-s_srs",
                     self.config["source_projection"],
                     "-t_srs",
@@ -198,15 +199,38 @@ class BuildMap(object):
 
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
 
-    def build_map(self):
-        #  Import each source DXF file into PostGIS
+    def dwg_to_dxf(self, source_path, dest_path):
+        self.log.info("Converting %s to DXF before importing...", source_path)
+        subprocess.check_call(["dwg2dxf", "--as", "r2007", "-o", dest_path, source_path])
+
+    def import_source_files(self):
+        #  Import each source file into PostGIS
         for table_name, source_file_data in self.config["source_file"].items():
             if "path" not in source_file_data:
                 self.log.error("No path found for source %s", table_name)
-                return
+                continue
             path = self.resolve_path(source_file_data["path"])
-            self.import_dxf(path, table_name)
+            extension = os.path.splitext(path)[1].lower()
+            if extension == ".dxf":
+                self.import_dxf(path, table_name)
+            elif extension == ".dwg":
+                tmp_dir = tempfile.mkdtemp(prefix="buildmap")
+                try:
+                    dxf_path = os.path.join(tmp_dir, "import.dxf")
+                    self.dwg_to_dxf(path, dxf_path)
+                    self.import_dxf(dxf_path, table_name)
+                finally:
+                    shutil.rmtree(tmp_dir)
+            else:
+                self.log.error(
+                    "Unrecognised file extension \"%s\" (expecting .dxf or .dwg) for source file %s",
+                    extension,
+                    path,
+                )
+                sys.exit(1)
 
+    def build_map(self):
+        self.import_source_files()
         self.log.info(
             "Map bounds (N, E, S, W): %s", list(reversed(self.get_bbox().bounds))
         )

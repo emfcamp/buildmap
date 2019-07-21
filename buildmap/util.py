@@ -2,6 +2,8 @@ import re
 
 
 def sanitise_layer(name):
+    if name is None:
+        return ''
     name = re.sub(r"[- (\.\.\.)]+", "_", name.lower())
     name = re.sub(r"[\(\)]", "", name)
     name = name.strip("_")
