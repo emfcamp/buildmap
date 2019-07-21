@@ -107,6 +107,8 @@ class BuildMap(object):
                     table_name,
                     "-f",
                     "PostgreSQL",
+                    "-lco",
+                    "GEOMETRY_NAME=wkb_geometry",
                     "-overwrite",
                     "PG:%s" % self.db.url,
                     dxf,
