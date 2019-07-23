@@ -17,7 +17,9 @@ class LinkType(Enum):
 
 
 class Link:
-    def __init__(self, from_switch, to_switch, type, length, cores, aggregated):
+    def __init__(
+        self, from_switch, to_switch, type, length, cores, aggregated, fibre_name
+    ):
         self.from_switch = from_switch
         self.to_switch = to_switch
         self.type = type
@@ -25,6 +27,7 @@ class Link:
         self.cores = cores
         self.cores_used = 0
         self.aggregated = aggregated
+        self.fibre_name = fibre_name
 
     def __repr__(self):
         return "<Link {from_switch} -> {to_switch} ({type})>".format(
@@ -212,16 +215,11 @@ class NocPlugin(object):
         self.log.info("Loading links")
 
         sql = self._sql(
-            """SELECT layer,
-                            round(ST_Length(wkb_geometry)::NUMERIC, 1) AS length,
-                            {columns},
-                            entityhandle,
-                            ogc_fid
+            """SELECT *, round(ST_Length(wkb_geometry)::NUMERIC, 1) AS length
                         FROM {table}
                         WHERE layer = ANY(:link_layers)
                         AND ST_GeometryType(wkb_geometry) = 'ST_LineString'
-                    """,
-            cols=["cores", "updowns", "aggregated"],
+                    """
         )
         for row in self.db.execute(sql, link_layers=list(self.link_layers.keys())):
             from_switch = self._find_switch_from_link(
@@ -253,7 +251,13 @@ class NocPlugin(object):
             if "aggregated" in row and row["aggregated"] is not None:
                 aggregated = True
 
-            yield Link(from_switch, to_switch, type, length, cores, aggregated)
+            fibre_name = None
+            if "fiber" in row:
+                fibre_name = row["fiber"]
+
+            yield Link(
+                from_switch, to_switch, type, length, cores, aggregated, fibre_name
+            )
 
     def order_links_from_switch(self, switch_name):
         if switch_name in self.processed_switches:
@@ -412,6 +416,8 @@ class NocPlugin(object):
         label = "<"
 
         if link.type == LinkType.Fibre:
+            if link.fibre_name:
+                label += link.fibre_name + ": "
             if link.cores_used != link.cores:
                 label += str(link.cores_used) + "/"
             label += str(link.cores) + " " + ("cores" if link.cores > 1 else "core")
