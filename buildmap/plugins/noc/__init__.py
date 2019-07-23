@@ -5,6 +5,7 @@ from enum import Enum
 import os.path
 import pydotplus as pydot  # type: ignore
 import csv
+import html
 from sqlalchemy.sql import text
 from datetime import date
 
@@ -417,7 +418,7 @@ class NocPlugin(object):
 
         if link.type == LinkType.Fibre:
             if link.fibre_name:
-                label += link.fibre_name + ": "
+                label += html.escape(link.fibre_name) + ": "
             if link.cores_used != link.cores:
                 label += str(link.cores_used) + "/"
             label += str(link.cores) + " " + ("cores" if link.cores > 1 else "core")
