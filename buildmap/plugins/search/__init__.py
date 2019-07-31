@@ -6,6 +6,7 @@ from shapely import wkt
 
 class SearchPlugin(object):
     """ Generate a JSON search index file to power JS search """
+
     def __init__(self, buildmap, _config, opts, db):
         self.db = db
         self.buildmap = buildmap
@@ -24,12 +25,14 @@ class SearchPlugin(object):
             )
             for row in q:
                 point = wkt.loads(row[0])
-                data.append({
-                    'gid': row[1],
-                    'layer': layer,
-                    'position': [point.x, point.y],
-                    'name': row[2]
-                });
+                data.append(
+                    {
+                        "gid": row[1],
+                        "layer": layer,
+                        "position": [point.x, point.y],
+                        "name": row[2],
+                    }
+                )
 
         return data
 
@@ -37,8 +40,13 @@ class SearchPlugin(object):
         data = self.get_data()
 
         out_path = os.path.join(
-            self.buildmap.resolve_path(self.buildmap.config["web_directory"]), "search.json"
+            self.buildmap.resolve_path(self.buildmap.config["web_directory"]), "search"
         )
 
-        with open(out_path, 'w') as f:
+        try:
+            os.makedirs(out_path)
+        except FileExistsError:
+            pass
+
+        with open(os.path.join(out_path, "search.json"), "w") as f:
             json.dump(data, f)
