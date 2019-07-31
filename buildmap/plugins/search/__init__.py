@@ -29,7 +29,7 @@ class SearchPlugin(object):
                     {
                         "gid": row[1],
                         "layer": layer,
-                        "position": [point.x, point.y],
+                        "position": [round(point.x, 5), round(point.y, 5)],
                         "name": row[2].replace("-\n", ""),
                     }
                 )
