@@ -30,7 +30,7 @@ class SearchPlugin(object):
                         "gid": row[1],
                         "layer": layer,
                         "position": [point.x, point.y],
-                        "name": row[2],
+                        "name": row[2].replace("-\n", ""),
                     }
                 )
 
