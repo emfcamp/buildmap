@@ -17,22 +17,32 @@ class SearchPlugin(object):
         table = "site_plan"
 
         for layer in self.opts.get("layers", []):
+            cols = ["text"]
+            # Add any translated columns
+            cols += [
+                attr
+                for attr in self.buildmap.known_attributes[table]
+                if attr.startswith("text_")
+            ]
+
             q = self.db.execute(
                 text(
-                    "SELECT ST_AsText(ST_Transform(wkb_geometry, 4326)), ogc_fid, text FROM %s WHERE layer = '%s'"
-                    % (table, layer)
+                    "SELECT ST_AsText(ST_Transform(wkb_geometry, 4326)) AS geom, ogc_fid, %s FROM %s WHERE layer = '%s'"
+                    % (",".join(cols), table, layer)
                 )
             )
             for row in q:
-                point = wkt.loads(row[0])
-                data.append(
-                    {
-                        "gid": row[1],
-                        "layer": layer,
-                        "position": [round(point.x, 5), round(point.y, 5)],
-                        "name": row[2].replace("-\n", ""),
-                    }
-                )
+                point = wkt.loads(row["geom"])
+                record = {
+                    "gid": row["ogc_fid"],
+                    "layer": layer,
+                    "position": [round(point.x, 5), round(point.y, 5)],
+                }
+
+                for col in cols:
+                    record[col] = row[col].replace("-\n", "") if row[col] else None
+
+                data.append(record)
 
         return data
 
