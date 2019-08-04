@@ -227,13 +227,22 @@ class BuildMap(object):
 
         self.db.create_bounding_layer("bounding_box", self.get_bbox())
 
-        self.log.info("Running exporters...")
-        mapnik_exporter = None
-        exporters = []
+        for plugin, opts in self.config.get("plugins", {}).items():
+            try:
+                pluginmod = importlib.import_module("." + plugin, "buildmap.plugins")
+                self.log.info("Running plugin %s...", plugin)
+            except ImportError as e:
+                self.log.exception("Plugin %s not loaded: %s", plugin, e)
+                continue
+            plugincls = getattr(pluginmod, plugin.capitalize() + "Plugin")
+            plugincls(self, self.config, opts, self.db).run()
 
         # Exporters are imported on demand here, so that modules required by a
         # single exporter don't prevent buildmap from running if that exporter is
         # unused
+        self.log.info("Running exporters...")
+        mapnik_exporter = None
+        exporters = []
 
         if "vector_layer" in self.config:
             from .exporter.geojson import GeoJSONExporter
@@ -257,16 +266,6 @@ class BuildMap(object):
 
         for exporter in exporters:
             exporter.export()
-
-        for plugin, opts in self.config.get("plugins", {}).items():
-            try:
-                pluginmod = importlib.import_module("." + plugin, "buildmap.plugins")
-                self.log.info("Running plugin %s...", plugin)
-            except ImportError as e:
-                self.log.exception("Plugin %s not loaded: %s", plugin, e)
-                continue
-            plugincls = getattr(pluginmod, plugin.capitalize() + "Plugin")
-            plugincls(self, self.config, opts, self.db).run()
 
         if self.args.preseed and mapnik_exporter is not None:
             mapnik_exporter.preseed()
