@@ -1,13 +1,21 @@
 Buildmap
 ========
+[![CircleCI](https://circleci.com/gh/emfcamp/buildmap.svg?style=svg)](https://circleci.com/gh/emfcamp/buildmap)
 
-A GIS workflow pipeline for designing festivals.
+A GIS workflow pipeline for designing festivals. Buildmap has been
+used for [Electromagnetic Field](https://www.emfcamp.org),
+[Chaos Computer Club](https://ccc.de), and [IFCAT](https://ifcat.org)
+hacker camps in Europe.
 
-Buildmap takes a CAD site plan in DXF format and produces a slippy
-map for viewing on the web. The recommended output format is Mapbox
-Vector Tiles, for vector rendering with Mapbox GL JS or OpenLayers.
+Buildmap takes a CAD site plan in DXF format and produces a clean
+PostGIS geodatabase as well as a tileserver configuration for rendering
+the map on the web. The recommended output format is [Mapbox
+Vector Tiles](https://docs.mapbox.com/vector-tiles/reference/) via 
+[Tegola](https://tegola.io/), for vector rendering with 
+[Mapbox GL JS](https://docs.mapbox.com/mapbox-gl-js/api/) or
+[OpenLayers](https://openlayers.org/).
 
-Buildmap has a plugin system for extensibility and plugins exist
+Buildmap has an extensible plugin system and [plugins exist](buildmap/plugins)
 for power and network planning, statistics, in-browser search,
 and translation.
 
