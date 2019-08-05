@@ -27,7 +27,9 @@ class SearchPlugin(object):
 
             q = self.db.execute(
                 text(
-                    "SELECT ST_AsText(ST_Transform(wkb_geometry, 4326)) AS geom, ogc_fid, %s FROM %s WHERE layer = '%s'"
+                    """SELECT ST_AsText(ST_Transform(wkb_geometry, 4326)) AS geom, ogc_fid, %s
+                        FROM %s
+                        WHERE layer = '%s' AND text IS NOT NULL AND text != ''"""
                     % (",".join(cols), table, layer)
                 )
             )
