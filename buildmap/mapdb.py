@@ -17,6 +17,8 @@ class MapDB(object):
     # Regex to match common embedded DXF text formatting codes. Probably not exhaustive.
     # c.f. http://www.cadforum.cz/cadforum_en/text-formatting-codes-in-mtext-objects-tip8640
     MTEXT_FORMAT_REGEX = r"(\\[A-Za-z]([A-Za-z0-9\.\|]+;))*"
+    # Regex to match inline formatting which looks like {\fArial|b0|i0|c0|p34;TEXT}
+    INLINE_FORMAT_REGEX = r"{\\f.*;([^;]+)}"
 
     def __init__(self, url):
         self.log = logging.getLogger(self.__class__.__name__)
@@ -171,8 +173,8 @@ class MapDB(object):
             # Strip formatting codes from text
             self.conn.execute(
                 text(
-                    "UPDATE %s SET text = regexp_replace(text, '%s', '')"
-                    % (table_name, self.MTEXT_FORMAT_REGEX)
+                    "UPDATE %s SET text = regexp_replace(regexp_replace(text, '%s', ''), '%s', '\\1')"
+                    % (table_name, self.MTEXT_FORMAT_REGEX, self.INLINE_FORMAT_REGEX)
                 )
             )
             # Convert closed linestrings to polygons
