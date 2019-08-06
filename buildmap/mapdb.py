@@ -162,9 +162,11 @@ class MapDB(object):
     def clean_layers(self, table_name):
         """ Tidy up some mess in Postgres which ogr2ogr makes when importing DXFs. """
         with self.conn.begin():
-            # Fix newlines in labels
+            # Fix newlines in labels and trim whitespace
             self.conn.execute(
-                text("UPDATE %s SET text = replace(text, '^J', '\n')" % table_name)
+                text(
+                    "UPDATE %s SET text = trim(replace(text, '^J', '\n'))" % table_name
+                )
             )
             # Remove "SOLID" labels from fills
             self.conn.execute(
