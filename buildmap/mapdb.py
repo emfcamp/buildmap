@@ -79,6 +79,17 @@ class MapDB(object):
         for record in result:
             # Curly braces surround some sets of attributes for some reason.
             attrs = record[1].strip(" {}")
+
+            if len(attrs.split(":")) == 2:
+                # This only has one attribute, so use simplified parsing which
+                # allows spaces. This hack means that we can use spaces in road
+                # names, etc, as long as there's only one attribute.
+                name, value = attrs.split(":")
+                name = name.replace(".", "_")
+                known_attributes.add(name)
+                attributes[record[0]].append((name, value))
+                continue
+
             try:
                 for attr in attrs.split(" "):
                     # Some DXFs seem to separate keys/values with :, some with =
