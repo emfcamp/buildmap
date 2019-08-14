@@ -30,7 +30,8 @@ setup(
         "argparse",
         "psycopg2",
         "toml",
-        "pydotplus"
+        "pydotplus",
+        "pint"
     ],
     entry_points={"console_scripts": {"buildmap=buildmap.main:run"}},
 )
