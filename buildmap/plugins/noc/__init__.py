@@ -83,12 +83,7 @@ class LogicalLink:
     """
 
     def __init__(
-        self,
-        from_switch: Switch,
-        to_switch: Switch,
-        type,
-        total_length,
-        couplers: int,
+        self, from_switch: Switch, to_switch: Switch, type, total_length, couplers: int
     ):
         self.from_switch = from_switch
         self.to_switch = to_switch
