@@ -4,6 +4,10 @@ from functools import total_ordering
 from enum import Enum
 from .util import unit
 
+COUPLER_LOSS = Decimal("0.2") * unit.decibel
+FIBRE_LOSS = Decimal("0.5") * (unit.decibel / unit.kilometer)
+CONNECTOR_LOSS = Decimal("0.1") * unit.decibel
+
 
 class LinkType(Enum):
     Copper = "copper"
@@ -74,24 +78,29 @@ class LogicalLink:
         patched/coupled through an intermediate location.
     """
 
-    def __init__(
-        self, from_switch: Switch, to_switch: Switch, type, total_length, couplers: int
-    ):
+    def __init__(self, from_switch: Switch, to_switch: Switch, type):
         self.from_switch = from_switch
         self.to_switch = to_switch
         self.type = type
-        self.total_length = total_length
-        self.couplers = couplers
+        self.physical_links = []
+
+    @property
+    def total_length(self):
+        return sum(link.length for link in self.physical_links)
+
+    @property
+    def couplers(self):
+        return len(self.physical_links) - 1
+
+    @property
+    def deployed(self):
+        return all(link.deployed for link in self.physical_links)
 
     def loss(self):
         """ Return an approximation of loss in dB """
 
         if self.type == LinkType.Copper:
             raise ValueError("Can't calculate link loss for copper!")
-
-        COUPLER_LOSS = Decimal("0.2") * unit.decibel
-        FIBRE_LOSS = Decimal("0.5") * (unit.decibel / unit.kilometer)
-        CONNECTOR_LOSS = Decimal("0.1") * unit.decibel
 
         return (
             self.couplers * COUPLER_LOSS

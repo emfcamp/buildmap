@@ -274,8 +274,7 @@ class NocPlugin(object):
                 # Extend to this switch
                 logical_link.from_switch = link.from_switch
                 logical_link.type = link.type
-                logical_link.total_length += link.length
-                logical_link.couplers += 1
+                logical_link.physical_links.append(link)
 
                 # If it's fibre, and the "aggregated" attribute isn't set, we try to
                 # extend the logical link
@@ -330,7 +329,7 @@ class NocPlugin(object):
 
         for switch in self.switches.values():
             if switch != root_switch:
-                logical_link = LogicalLink(None, switch, None, 0, -1)
+                logical_link = LogicalLink(None, switch, None)
                 self._make_logical_link(switch, logical_link)
                 if logical_link.type is None:
                     self._warning("Unable to trace logical uplink for %s" % switch)
@@ -519,6 +518,8 @@ class NocPlugin(object):
             # edge.set_tailport('output')
             edge.set_label(label)
             edge.set_color(colour)
+            if not logical_link.deployed:
+                edge.set("style", "dashed")
             sg.add_edge(edge)
 
         return dot
