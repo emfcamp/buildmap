@@ -1,116 +1,14 @@
 import logging
 import time
-from functools import total_ordering
-from enum import Enum
 import os.path
 import pydotplus as pydot  # type: ignore
 import csv
 import html
-import pint
-from decimal import Decimal
-from typing import Iterator, Optional
+from typing import Iterator
 from sqlalchemy.sql import text
 from datetime import date
-
-unit = pint.UnitRegistry()
-unit.define("decibel = [loss] = dB")
-
-
-class LinkType(Enum):
-    Copper = "copper"
-    Fibre = "fibre"
-
-
-@total_ordering
-class Switch:
-    """ The `cores_required` attribute indicates how many uplink
-        cores this switch requires - usually 1 bidi link in our case. """
-
-    def __init__(self, name: str, cores_required: int = 1):
-        self.name = name
-        self.cores_required = cores_required
-
-    def __repr__(self) -> str:
-        return "<Switch {}>".format(self.name)
-
-    def __eq__(self, other):
-        if type(other) != type(self):
-            return False
-        return self.name.lower() == other.name.lower()
-
-    def __gt__(self, other):
-        if type(other) != type(self):
-            return False
-        return self.name.lower() > other.name.lower()
-
-    def __str__(self):
-        return self.name
-
-    def __hash__(self):
-        return hash(self.name)
-
-
-class Link:
-    def __init__(
-        self,
-        from_switch: Switch,
-        to_switch: Switch,
-        type: LinkType,
-        length: int,
-        cores: int,
-        aggregated: bool,
-        fibre_name: Optional[str],
-    ):
-        self.from_switch = from_switch
-        self.to_switch = to_switch
-        self.type = type
-        self.length = length
-        self.cores = cores
-        self.cores_used = 0
-        self.aggregated = aggregated
-        self.fibre_name = fibre_name
-
-    def __repr__(self) -> str:
-        return "<Link {from_switch} -> {to_switch} ({type})>".format(
-            from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
-        )
-
-
-class LogicalLink:
-    """ A logical link represents a direct network path between two switches.
-        Logical links can span more than one physical cable when the link is passively
-        patched/coupled through an intermediate location.
-    """
-
-    def __init__(
-        self, from_switch: Switch, to_switch: Switch, type, total_length, couplers: int
-    ):
-        self.from_switch = from_switch
-        self.to_switch = to_switch
-        self.type = type
-        self.total_length = total_length
-        self.couplers = couplers
-
-    def loss(self):
-        """ Return an approximation of loss in dB """
-
-        if self.type == LinkType.Copper:
-            raise ValueError("Can't calculate link loss for copper!")
-
-        COUPLER_LOSS = Decimal("0.2") * unit.decibel
-        FIBRE_LOSS = Decimal("0.5") * (unit.decibel / unit.kilometer)
-        CONNECTOR_LOSS = Decimal("0.1") * unit.decibel
-
-        return (
-            self.couplers * COUPLER_LOSS
-            + self.total_length * FIBRE_LOSS
-            + 2 * CONNECTOR_LOSS
-        )
-
-    def __repr__(self):
-        return "<LogicalLink {from_switch} -> {to_switch} ({type})>".format(
-            from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
-        )
+from .data import LinkType, Switch, LogicalLink, Link
+from .util import unit, get_col
 
 
 class NocPlugin(object):
@@ -213,11 +111,11 @@ class NocPlugin(object):
                     % (row["entityhandle"], self.switch_layer)
                 )
                 name = row["entityhandle"]
-            if "cores_required" in row and row["cores_required"] is not None:
-                cores_required = int(row["cores_required"])
-            else:
-                cores_required = 1
-            yield Switch(name, cores_required)
+            yield Switch(
+                name,
+                int(get_col(row, "cores_required", 1)),
+                get_col(row, "deployed") == "true",
+            )
 
     def _find_switch_from_link(
         self, edge_entityhandle, edge_layer, edge_ogc_fid, start_or_end
@@ -299,16 +197,15 @@ class NocPlugin(object):
                 )
                 cores = 1
 
-            aggregated = False
-            if "aggregated" in row and row["aggregated"] is not None:
-                aggregated = True
-
-            fibre_name = None
-            if "fiber" in row:
-                fibre_name = row["fiber"]
-
             yield Link(
-                from_switch, to_switch, type, length, cores, aggregated, fibre_name
+                from_switch=from_switch,
+                to_switch=to_switch,
+                type=type,
+                length=length,
+                cores=cores,
+                deployed=get_col(row, "deployed") == "true",
+                aggregated=get_col(row, "aggregated") is not None,
+                fibre_name=get_col(row, "fiber"),
             )
 
     def order_links_from_switch(self, switch: Switch):
@@ -595,6 +492,8 @@ class NocPlugin(object):
             # edge.set_tailport('output')
             edge.set_label(label)
             edge.set_color(colour)
+            if not link.deployed:
+                edge.set("style", "dashed")
             sg.add_edge(edge)
 
         return dot

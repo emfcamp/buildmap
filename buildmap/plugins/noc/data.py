@@ -1,0 +1,105 @@
+from typing import Optional
+from decimal import Decimal
+from functools import total_ordering
+from enum import Enum
+from .util import unit
+
+
+class LinkType(Enum):
+    Copper = "copper"
+    Fibre = "fibre"
+
+
+@total_ordering
+class Switch:
+    """ The `cores_required` attribute indicates how many uplink
+        cores this switch requires - usually 1 bidi link in our case. """
+
+    def __init__(self, name: str, cores_required: int = 1, deployed: bool = False):
+        self.name = name
+        self.cores_required = cores_required
+        self.deployed = deployed
+
+    def __repr__(self) -> str:
+        return "<Switch {}>".format(self.name)
+
+    def __eq__(self, other):
+        if type(other) != type(self):
+            return False
+        return self.name.lower() == other.name.lower()
+
+    def __gt__(self, other):
+        if type(other) != type(self):
+            return False
+        return self.name.lower() > other.name.lower()
+
+    def __str__(self):
+        return self.name
+
+    def __hash__(self):
+        return hash(self.name)
+
+
+class Link:
+    def __init__(
+        self,
+        from_switch: Switch,
+        to_switch: Switch,
+        type: LinkType,
+        length: int,
+        cores: int,
+        aggregated: bool,
+        deployed: bool,
+        fibre_name: Optional[str],
+    ):
+        self.from_switch = from_switch
+        self.to_switch = to_switch
+        self.type = type
+        self.length = length
+        self.cores = cores
+        self.cores_used = 0
+        self.aggregated = aggregated
+        self.fibre_name = fibre_name
+        self.deployed = deployed
+
+    def __repr__(self) -> str:
+        return "<Link {from_switch} -> {to_switch} ({type})>".format(
+            from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
+        )
+
+
+class LogicalLink:
+    """ A logical link represents a direct network path between two switches.
+        Logical links can span more than one physical cable when the link is passively
+        patched/coupled through an intermediate location.
+    """
+
+    def __init__(
+        self, from_switch: Switch, to_switch: Switch, type, total_length, couplers: int
+    ):
+        self.from_switch = from_switch
+        self.to_switch = to_switch
+        self.type = type
+        self.total_length = total_length
+        self.couplers = couplers
+
+    def loss(self):
+        """ Return an approximation of loss in dB """
+
+        if self.type == LinkType.Copper:
+            raise ValueError("Can't calculate link loss for copper!")
+
+        COUPLER_LOSS = Decimal("0.2") * unit.decibel
+        FIBRE_LOSS = Decimal("0.5") * (unit.decibel / unit.kilometer)
+        CONNECTOR_LOSS = Decimal("0.1") * unit.decibel
+
+        return (
+            self.couplers * COUPLER_LOSS
+            + self.total_length * FIBRE_LOSS
+            + 2 * CONNECTOR_LOSS
+        )
+
+    def __repr__(self):
+        return "<LogicalLink {from_switch} -> {to_switch} ({type})>".format(
+            from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
+        )
