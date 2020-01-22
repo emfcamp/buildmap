@@ -23,6 +23,7 @@ setup(
     python_requires=">=3.5",
     packages=["buildmap", "buildmap.exporter", "buildmap.plugins"],
     install_requires=[
+        "jinja2",
         "gunicorn",
         "sqlalchemy",
         "shapely",

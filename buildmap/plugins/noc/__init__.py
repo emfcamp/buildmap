@@ -17,7 +17,7 @@ class NocPlugin(object):
     BUFFER = 1
 
     # How many metres to add per and up-and-down a festoon pole
-    UPDOWN_LENGTH = 6
+    UPDOWN_LENGTH = 6 * unit.meters
 
     # Colours for the output diagrams - https://graphviz.org/doc/info/colors.html
     COLOUR_HEADER = "lightcyan1"
@@ -25,11 +25,11 @@ class NocPlugin(object):
     COLOUR_FIBRE = "goldenrod"
 
     # Copper links below this length are considered to be CCA
-    LENGTH_COPPER_NOT_CCA = 30
+    LENGTH_COPPER_NOT_CCA = 30 * unit.meters
 
     # Copper links above these lengths will generate warnings or errors
-    LENGTH_COPPER_WARNING = 70
-    LENGTH_COPPER_CRITICAL = 90
+    LENGTH_COPPER_WARNING = 70 * unit.meters
+    LENGTH_COPPER_CRITICAL = 90 * unit.meters
 
     def __init__(self, buildmap, _config, opts, db):
         self.log = logging.getLogger(__name__)
@@ -377,17 +377,16 @@ class NocPlugin(object):
                 label += "<br/>(aggregated)"
             colour = self.COLOUR_FIBRE
         elif link.type == LinkType.Copper:
-            length = float(link.length)
             if link.cores and int(link.cores) > 1:
                 label += "<b>{}x</b> ".format(link.cores)
 
             label += self.get_link_medium(link)
 
             colour = self.COLOUR_COPPER
-            if length > self.LENGTH_COPPER_CRITICAL:
+            if link.length > self.LENGTH_COPPER_CRITICAL:
                 open += '<font color="red">'
                 close = "</font>" + close
-            elif length > self.LENGTH_COPPER_WARNING:
+            elif link.length > self.LENGTH_COPPER_WARNING:
                 open += '<font color="orange">'
                 close = "</font>" + close
         else:
@@ -526,8 +525,7 @@ class NocPlugin(object):
 
     def get_link_medium(self, link: Link):
         if link.type == LinkType.Copper:
-            length = float(link.length)
-            if length <= self.LENGTH_COPPER_NOT_CCA:
+            if link.length <= self.LENGTH_COPPER_NOT_CCA:
                 return "CCA"
         return link.type.value.title()
 

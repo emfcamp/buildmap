@@ -29,7 +29,7 @@ class TegolaExporter(Exporter):
             toml.dump(self.generate_tegola_config(), fp)
 
     def get_layers(self):
-        """ Generate `(tablename, layername, sql)` for each layer we want to render.
+        """ Generate `(tablename, layername, type, sql)` for each layer we want to render.
 
             MVT/Tegola only supports layers with a single geometry type, whereas DXF will
             happily let you have layers with multiple types. We output a layer per
@@ -42,25 +42,29 @@ class TegolaExporter(Exporter):
             # We can handle those in get_layer_sql
             types = self.db.get_layer_type(table_name, layer_name)
             if len(types) == 1:
-                layer_name_typ = layer_name + "_" + types[0].lower().split("_")[1]
+                typename = types[0].split("_")[1]
+                layer_name_typ = layer_name + "_" + typename.lower()
                 if sanitise_layer(layer_name_typ) in seen:
                     continue
                 seen.add(sanitise_layer(layer_name_typ))
                 yield (
                     table_name,
                     layer_name_typ,
+                    typename,
                     self.get_layer_sql(table_name, layer_name, types[0]),
                 )
             else:
                 # Multiple simple types. Split them into different layers.
                 for typ in types:
-                    layer_name_typ = layer_name + "_" + typ.lower().split("_")[1]
+                    typename = typ.split("_")[1]
+                    layer_name_typ = layer_name + "_" + typename.lower()
                     if sanitise_layer(layer_name_typ) in seen:
                         continue
                     seen.add(sanitise_layer(layer_name_typ))
                     yield (
                         table_name,
                         layer_name_typ,
+                        typename,
                         self.get_layer_sql(table_name, layer_name, typ),
                     )
 
@@ -80,14 +84,22 @@ class TegolaExporter(Exporter):
 
         layers = list(self.get_layers())
 
-        for table_name, layer_name, sql in layers:
-            provider["layers"].append({"name": sanitise_layer(layer_name), "sql": sql})
+        for table_name, layer_name, typename, sql in layers:
+            provider["layers"].append(
+                {
+                    "name": sanitise_layer(layer_name),
+                    "sql": sql,
+                    "geometry_type": typename,
+                }
+            )
 
         m = {
             "name": "buildmap",
-            "bounds": list(self.buildmap.get_bbox().bounds),
+            # Apply a 0.5 degree buffer to bounds Tegola is allowed to serve.
+            # This restricts the amount of empty tiles will cache while allowing some margin.
+            "bounds": list(self.buildmap.get_bbox().buffer(0.5).bounds),
             "center": self.buildmap.get_center()
-            + [float(self.config["zoom_range"][0])],
+            + [float(16)],
             "layers": [],
         }
 
@@ -97,7 +109,7 @@ class TegolaExporter(Exporter):
         ):
             m["attribution"] = self.config["mapbox_vector_layer"]["attribution"]
 
-        for table_name, layer_name, _ in layers:
+        for table_name, layer_name, _, _ in layers:
             m["layers"].append(
                 {
                     "provider_layer": "%s.%s"
@@ -107,18 +119,18 @@ class TegolaExporter(Exporter):
                 }
             )
 
-        # Add bounding box layer to config
+        # Add bounding box layer to config. Bounding box in DB is in EPSG:4326
         provider["layers"].append(
             {
                 "name": "bounding_box",
                 "sql": """SELECT id AS gid,
                         ST_AsBinary(ST_Transform(wkb_geometry, {out_proj})) AS geom
                         FROM bounding_box
-                        WHERE wkb_geometry && ST_Transform(!BBOX!, {db_proj})
+                        WHERE wkb_geometry && ST_Transform(!BBOX!, 4326)
                    """.format(
-                    out_proj=self.SRID,
-                    db_proj=strip_srid(self.config["source_projection"]),
+                    out_proj=self.SRID
                 ),
+                "geometry_type": "Polygon",
             }
         )
 
