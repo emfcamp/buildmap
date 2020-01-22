@@ -6,6 +6,7 @@ RUN apt-get update && \
 
 WORKDIR /buildmap
 COPY . /buildmap
+RUN pip install git+git://github.com/emfcamp/powerplan.git#egg=powerplan
 RUN pip install -e /buildmap
 
 ENTRYPOINT ["/usr/local/bin/buildmap"]
