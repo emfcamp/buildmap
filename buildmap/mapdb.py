@@ -6,12 +6,14 @@ from time import sleep
 from shapely import wkt
 from sqlalchemy.sql import text
 
+from .dxfutils import parse_attributes
+
 
 class MapDB(object):
-    """ Wrap common PostGIS operations.
+    """Wrap common PostGIS operations.
 
-        Before you get all annoyed about me not using bind variables here,
-        you can't use them for table names, and the entire database is throwaway.
+    Before you get all annoyed about me not using bind variables here,
+    you can't use them for table names, and the entire database is throwaway.
     """
 
     # Regex to match common embedded DXF text formatting codes. Probably not exhaustive.
@@ -56,62 +58,30 @@ class MapDB(object):
         return True
 
     def extract_attributes(self, table):
-        """ Extract DXF extended attributes into columns so we can use them in Mapnik"""
+        """Extract DXF extended attributes into columns so we can use them in Mapnik"""
         with self.conn.begin():
             return self.extract_attributes_for_table(table)
 
     def extract_attributes_for_table(self, table_name):
-        """ Extract the DXF's XDATA attributes into individual columns.
+        """Extract the DXF's XDATA attributes into individual columns.
 
-            When GDAL imports a DXF into PostGIS, it stuffs all the attributes
-            into the "extendedentity" column. This function attempts to extract
-            them nicely so we can use them.
+        We use GDAL's "DXF_INCLUDE_RAW_CODE_VALUES" option which includes
+        the raw values of any unparsed attributes in the `rawcodevalues` column,
+        which is an array.
         """
         known_attributes = set()
-        attributes = defaultdict(list)
+        attributes = {}
         result = self.conn.execute(
             text(
-                """SELECT ogc_fid, extendedentity FROM %s
-                                        WHERE extendedentity IS NOT NULL"""
+                """SELECT ogc_fid, rawcodevalues FROM %s
+                                        WHERE rawcodevalues IS NOT NULL"""
                 % table_name
             )
         )
-        for record in result:
-            # Curly braces surround some sets of attributes for some reason.
-            attrs = record[1].strip(" {}")
-
-            if len(attrs.split(":")) == 2:
-                # This only has one attribute, so use simplified parsing which
-                # allows spaces. This hack means that we can use spaces in road
-                # names, etc, as long as there's only one attribute.
-                name, value = attrs.split(":")
-                name = name.replace(".", "_")
-                known_attributes.add(name)
-                attributes[record[0]].append((name, value))
-                continue
-
-            try:
-                for attr in attrs.split(" "):
-                    # Some DXFs seem to separate keys/values with :, some with =
-                    if ":" in attr:
-                        name, value = attr.split(":", 1)
-                    elif "=" in attr:
-                        name, value = attr.split("=", 1)
-                    else:
-                        continue
-
-                    # Replace the dot character with underscore, as it's not valid in SQL
-                    name = name.replace(".", "_")
-                    known_attributes.add(name)
-                    attributes[record[0]].append((name, value))
-            except ValueError:
-                # This is ambiguous to parse, I think it's GDAL's fault for cramming them
-                # into one field
-                self.log.error(
-                    "Cannot extract attributes as an attribute field contains a space: %s",
-                    attrs,
-                )
-                continue
+        for fid, rawcodevalues in result:
+            attrs = parse_attributes(rawcodevalues)
+            attributes[fid] = attrs
+            known_attributes.update(attrs.keys())
 
         for attr_name in known_attributes:
             self.conn.execute(
@@ -119,7 +89,7 @@ class MapDB(object):
             )
 
         for ogc_fid, attrs in attributes.items():
-            for name, value in attrs:
+            for name, value in attrs.items():
                 self.conn.execute(
                     text(
                         "UPDATE %s SET %s = :value WHERE ogc_fid = :fid"
@@ -131,7 +101,7 @@ class MapDB(object):
         return known_attributes
 
     def get_bounds(self, table_name, srs=4326):
-        """ Fetch the bounding box of all rows within a table. """
+        """Fetch the bounding box of all rows within a table."""
         # Performance note: it's neater to transform coordinates to the target SRS before
         # running ST_Extent, as it doesn't require us knowing what the table SRS is, but
         # this is obviously much slower. It doesn't seem to be an issue so far though.
@@ -144,11 +114,11 @@ class MapDB(object):
         return wkt.loads(res[0])
 
     def create_bounding_layer(self, table_name, bbox, srid=4326):
-        """ Create a new table containing a single row representing the bounding box
-            of the map. This can be used by renderers to mask off any background layers
-            behind our map.
+        """Create a new table containing a single row representing the bounding box
+        of the map. This can be used by renderers to mask off any background layers
+        behind our map.
 
-            `bbox` should be a shapely Polygon
+        `bbox` should be a shapely Polygon
         """
         with self.conn.begin():
             self.conn.execute(text('DROP TABLE IF EXISTS "%s"' % table_name))
@@ -171,7 +141,7 @@ class MapDB(object):
             )
 
     def clean_layers(self, table_name):
-        """ Tidy up some mess in Postgres which ogr2ogr makes when importing DXFs. """
+        """Tidy up some mess in Postgres which ogr2ogr makes when importing DXFs."""
         with self.conn.begin():
             # Fix newlines in labels and trim whitespace
             self.conn.execute(
@@ -224,8 +194,8 @@ class MapDB(object):
         )
 
     def clean_weird_unicode(self, table_name):
-        """ Sometimes text comes through as strange unicode in the format "\\U+00f6".
-            Probably AutoCAD's fault.
+        """Sometimes text comes through as strange unicode in the format "\\U+00f6".
+        Probably AutoCAD's fault.
         """
         MATCH_REGEX = r"\\U\+([0-9a-f]{4})"
         result = self.conn.execute(
@@ -243,7 +213,7 @@ class MapDB(object):
             )
 
     def prefix_handles(self, table_name, prefix):
-        """ Prefix entity handles to avoid collisions with multiple DXF files. """
+        """Prefix entity handles to avoid collisions with multiple DXF files."""
         with self.conn.begin():
             self.conn.execute(
                 text(
@@ -268,8 +238,8 @@ class MapDB(object):
             return [row[0] for row in result]
 
     def combine_lines(self, table_name, layer_name):
-        """ Given a layer which contains linestrings which *almost* comprise
-            polygons, try and combine them. """
+        """Given a layer which contains linestrings which *almost* comprise
+        polygons, try and combine them."""
         sets = []
         with self.conn.begin():
             sql = """SELECT a.ogc_fid, b.ogc_fid FROM {table} a, {table} b
@@ -315,8 +285,8 @@ class MapDB(object):
                 )
 
     def force_polygon(self, table_name, layer_name):
-        """ Force all linestring objects in a layer to be polygons by
-            calculating their concave hull. Handy for dealing with messy CAD files. """
+        """Force all linestring objects in a layer to be polygons by
+        calculating their concave hull. Handy for dealing with messy CAD files."""
         with self.conn.begin():
             sql = """UPDATE {table} SET wkb_geometry = ST_ConcaveHull(wkb_geometry, 0.9)
                         WHERE ST_Geometrytype(wkb_geometry) IN ('ST_LineString', 'ST_MultiLineString')
@@ -338,7 +308,7 @@ class MapDB(object):
         return [row[0] for row in res]
 
     def get_columns(self, table_name):
-        """ Return a list of columns for the given table """
+        """Return a list of columns for the given table"""
         result = self.conn.execute(
             text(
                 """SELECT column_name FROM information_schema.columns

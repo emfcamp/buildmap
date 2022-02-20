@@ -18,7 +18,7 @@ from . import plugins  # noqa
 
 
 def run():
-    """ Console script entry point """
+    """Console script entry point"""
     logging.basicConfig(level=logging.INFO)
     bm = BuildMap()
     bm.run()
@@ -85,7 +85,7 @@ class BuildMap(object):
         return os.path.normpath(os.path.join(self.base_path, path))
 
     def import_dxf(self, dxf, table_name):
-        """ Import the DXF into Postgres into the specified table name, overwriting the existing table. """
+        """Import the DXF into Postgres into the specified table name, overwriting the existing table."""
         if not os.path.isfile(dxf):
             raise Exception("Source DXF file %s does not exist" % dxf)
 
@@ -97,6 +97,9 @@ class BuildMap(object):
                     "--config",
                     "DXF_ENCODING",
                     "UTF-8",
+                    "--config",
+                    "DXF_INCLUDE_RAW_CODE_VALUES",
+                    "TRUE",
                     "-s_srs",
                     self.config["source_projection"],
                     "-t_srs",
@@ -110,7 +113,7 @@ class BuildMap(object):
                     "-lco",
                     "GEOMETRY_NAME=wkb_geometry",
                     "-overwrite",
-                    "PG:%s" % self.db.url,
+                    f"PG:{self.db.url}?application_name=buildmap",
                     dxf,
                 ]
             )
@@ -119,10 +122,10 @@ class BuildMap(object):
             sys.exit(1)
 
     def get_source_layers(self):
-        """ Get a list of source layers. Returns a list of (tablename, layername) tuples.
+        """Get a list of source layers. Returns a list of (tablename, layername) tuples.
 
-            Each layer name should only appear once in the result, even if it's present in
-            multiple files.
+        Each layer name should only appear once in the result, even if it's present in
+        multiple files.
         """
         results = []
         seen_layers = set()
@@ -148,10 +151,10 @@ class BuildMap(object):
         return results
 
     def get_bbox(self):
-        """ Return bounding box of the map, as a shapely Polygon in WGS84 coordinates.
+        """Return bounding box of the map, as a shapely Polygon in WGS84 coordinates.
 
-            `bbox.bounds` will return the extents as minx, miny, maxx, maxy
-            (W, S, E, N).
+        `bbox.bounds` will return the extents as minx, miny, maxx, maxy
+        (W, S, E, N).
         """
         if self.bbox:
             return self.bbox
@@ -168,7 +171,7 @@ class BuildMap(object):
         return self.bbox
 
     def get_center(self):
-        """ Return the center of the map, in WGS84 coordinates (lon, lat) """
+        """Return the center of the map, in WGS84 coordinates (lon, lat)"""
         centroid = self.get_bbox().centroid
         return list(centroid.coords[0])
 

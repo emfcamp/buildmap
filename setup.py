@@ -32,7 +32,7 @@ setup(
         "psycopg2",
         "toml",
         "pydotplus",
-        "pint"
+        "pint==0.18",
     ],
     entry_points={"console_scripts": {"buildmap=buildmap.main:run"}},
 )
