@@ -10,10 +10,10 @@ from . import Exporter
 
 
 class MapnikExporter(Exporter):
-    """ Take .mss (CartoCSS) files, transform them into Mapnik XML with Magnacarto,
-        and render them with Tilestache.
+    """Take .mss (CartoCSS) files, transform them into Mapnik XML with Magnacarto,
+    and render them with Tilestache.
 
-        This one is a bit of a beast. """
+    This one is a bit of a beast."""
 
     def export(self):
         #  Fetch source layer list from PostGIS
@@ -40,7 +40,7 @@ class MapnikExporter(Exporter):
             )
 
     def get_layer_css(self):
-        """ Return the paths of all CSS files (which correspond to destination layers)"""
+        """Return the paths of all CSS files (which correspond to destination layers)"""
         files = []
         for layer in self.config["raster_layer"]:
             files.append(
@@ -52,7 +52,7 @@ class MapnikExporter(Exporter):
         return [f for f in files if path.isfile(f)]
 
     def mml_layer(self, query, name):
-        """ Generate a layer structure for a MML file"""
+        """Generate a layer structure for a MML file"""
         data_source = {
             "extent": list(reversed(self.buildmap.get_bbox().bounds)),
             "table": query,
@@ -203,7 +203,7 @@ class MapnikExporter(Exporter):
             json.dump(result, fp)
 
     def preseed(self):
-        """ Pre-generate tiles with Tilestache """
+        """Pre-generate tiles with Tilestache"""
         self.log.info("Preseeding layers %s", self.dest_layers.keys())
         for filename in ("tilestache-seed.py", "tilestache-seed"):
             tilestache_seed = distutils.spawn.find_executable(filename)

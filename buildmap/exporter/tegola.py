@@ -10,12 +10,12 @@ def strip_srid(srid):
 
 
 class TegolaExporter(Exporter):
-    """ Generate config for Tegola, which is a Mapbox Vector Tiles server.
+    """Generate config for Tegola, which is a Mapbox Vector Tiles server.
 
-        There are some "impedance mismatches" here - mostly due to the fact that
-        a MVT layer can only have a single geometry type (I believe this is a Mapbox
-        GL requirement rather than a format restriction), and does not support
-        GeometryCollections (which is what DXF blocks become).
+    There are some "impedance mismatches" here - mostly due to the fact that
+    a MVT layer can only have a single geometry type (I believe this is a Mapbox
+    GL requirement rather than a format restriction), and does not support
+    GeometryCollections (which is what DXF blocks become).
     """
 
     PROVIDER_NAME = "buildmap"
@@ -29,11 +29,11 @@ class TegolaExporter(Exporter):
             toml.dump(self.generate_tegola_config(), fp)
 
     def get_layers(self):
-        """ Generate `(tablename, layername, type, sql)` for each layer we want to render.
+        """Generate `(tablename, layername, type, sql)` for each layer we want to render.
 
-            MVT/Tegola only supports layers with a single geometry type, whereas DXF will
-            happily let you have layers with multiple types. We output a layer per
-            geometry type in this case.
+        MVT/Tegola only supports layers with a single geometry type, whereas DXF will
+        happily let you have layers with multiple types. We output a layer per
+        geometry type in this case.
         """
         source = self.buildmap.get_source_layers()
         seen = set()
@@ -98,8 +98,7 @@ class TegolaExporter(Exporter):
             # Apply a 0.5 degree buffer to bounds Tegola is allowed to serve.
             # This restricts the amount of empty tiles will cache while allowing some margin.
             "bounds": list(self.buildmap.get_bbox().buffer(0.5).bounds),
-            "center": self.buildmap.get_center()
-            + [float(16)],
+            "center": self.buildmap.get_center() + [float(16)],
             "layers": [],
         }
 
@@ -151,13 +150,13 @@ class TegolaExporter(Exporter):
         return data
 
     def get_layer_sql(self, table_name, layer_name, geometry_type):
-        """ Generate the SQL for this layer.
+        """Generate the SQL for this layer.
 
-            `geometry_type` is the PostGIS geometry type we want to extract
-            (e.g. 'ST_LineString')
+        `geometry_type` is the PostGIS geometry type we want to extract
+        (e.g. 'ST_LineString')
 
-            We'll extract entities of the specified type from any ST_GeometryCollections
-            (which are generated from DXF blocks).
+        We'll extract entities of the specified type from any ST_GeometryCollections
+        (which are generated from DXF blocks).
         """
         geom_field = "wkb_geometry"
         fid_field = "ogc_fid"

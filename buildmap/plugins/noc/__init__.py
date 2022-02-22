@@ -48,7 +48,7 @@ class NocPlugin(object):
         self.table_columns = set(self.db.get_columns(self.table))
 
     def generate_layers_config(self):
-        " Detect NOC layers in map. "
+        "Detect NOC layers in map."
         self.log.info("Looking for NOC layers in table {}...".format(self.table))
         prefix = self.opts["layer_prefix"]
         layers = list(
@@ -161,7 +161,7 @@ class NocPlugin(object):
         return self.switches[switch_name]
 
     def get_links(self) -> Iterator[Link]:
-        """ Returns all the links """
+        """Returns all the links"""
         self.log.info("Loading links")
 
         sql = self._sql(
@@ -350,7 +350,7 @@ class NocPlugin(object):
         return label
 
     def _switch_label(self, switch):
-        " Label format for a switch. Using graphviz's HTML table support "
+        "Label format for a switch. Using graphviz's HTML table support"
 
         label = '<<table border="0" cellborder="1" cellspacing="0" cellpadding="4" color="grey30">\n'
         label += """<tr><td bgcolor="{colour}" colspan="2"><font point-size="16"><b>{name}</b></font></td>

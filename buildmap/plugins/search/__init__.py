@@ -5,7 +5,7 @@ from shapely import wkt
 
 
 class SearchPlugin(object):
-    """ Generate a JSON search index file to power JS search """
+    """Generate a JSON search index file to power JS search"""
 
     def __init__(self, buildmap, _config, opts, db):
         self.db = db

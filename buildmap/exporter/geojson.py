@@ -6,7 +6,7 @@ from . import Exporter
 
 
 class GeoJSONExporter(Exporter):
-    """ Render layers as untiled GeoJSON for display. """
+    """Render layers as untiled GeoJSON for display."""
 
     def export(self):
         start_time = time.time()

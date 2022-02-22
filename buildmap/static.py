@@ -3,7 +3,7 @@ import mapnik
 
 
 class StaticExporter(object):
-    """ Export static maps to PDF """
+    """Export static maps to PDF"""
 
     def __init__(self, config):
         self.log = logging.getLogger(__name__)

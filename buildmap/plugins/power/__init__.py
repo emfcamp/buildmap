@@ -35,7 +35,7 @@ class PowerPlugin(object):
         self.distros = {}
 
     def generate_layers_config(self):
-        " Detect power layers in map. "
+        "Detect power layers in map."
         prefix = self.opts["layer_prefix"]
         layers = list(
             self.db.execute(
@@ -100,10 +100,10 @@ class PowerPlugin(object):
             )
 
     def get_outbound_connections(self, ogc_fid):
-        """ Given the feature ID of a power network node, return all nodes which are connected to it,
-            along with the layer that connection is in. An edge (cable) is deemed to be connected to a
-            node if it ends within the "buffer" defined in self.BUFFER - this is in source CRS units
-            which should be meters."""
+        """Given the feature ID of a power network node, return all nodes which are connected to it,
+        along with the layer that connection is in. An edge (cable) is deemed to be connected to a
+        node if it ends within the "buffer" defined in self.BUFFER - this is in source CRS units
+        which should be meters."""
 
         sql = text(
             """SELECT end_node.ogc_fid, edge.layer,

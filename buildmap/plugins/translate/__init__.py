@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 
 class TranslatePlugin(object):
-    """ Translate or modify map text. """
+    """Translate or modify map text."""
 
     def __init__(self, buildmap, _config, opts, db):
         self.db = db
