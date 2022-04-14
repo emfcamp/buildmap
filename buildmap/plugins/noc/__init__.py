@@ -7,8 +7,8 @@ import html
 from typing import Iterator
 from sqlalchemy.sql import text
 from datetime import date
-from .data import LinkType, Switch, LogicalLink, Link
 from .util import unit, get_col
+from .data import LinkType, Switch, LogicalLink, Link
 
 
 class NocPlugin(object):
