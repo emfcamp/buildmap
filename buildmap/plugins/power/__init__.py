@@ -4,7 +4,7 @@ import re
 import powerplan
 import os.path
 from powerplan.diagram import to_dot
-from powerplan.bom import generate_bom_html
+from powerplan.bom import generate_bom_html, generate_bom_csvs
 from collections import namedtuple
 from sqlalchemy.sql import text
 
@@ -242,5 +242,10 @@ class PowerPlugin(object):
 
         with open(os.path.join(out_path, "power-bom.html"), "w") as f:
             f.write(generate_bom_html(plan))
+
+        with open(os.path.join(out_path, "cables-bom.csv"), "w") as cables, open(
+            os.path.join(out_path, "distros-bom.csv"), "w"
+        ) as distros:
+            generate_bom_csvs(plan, distros, cables)
 
         self.log.info("Power plans output to %s", out_path)
