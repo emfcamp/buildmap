@@ -6,7 +6,8 @@ RUN apt-get update && \
 
 WORKDIR /buildmap
 COPY . /buildmap
-RUN pip install git+https://github.com/emfcamp/powerplan.git@48ae217c2c6384653d4db066373bffdc1114598c#egg=powerplan
+RUN git clone https://github.com/emfcamp/powerplan.git /powerplan
+RUN pip install -e /powerplan
 RUN pip install -e /buildmap
 
 ENV PROJ_NETWORK ON
