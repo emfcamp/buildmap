@@ -15,7 +15,7 @@ class LinkType(Enum):
 
 
 @total_ordering
-class Switch:
+class Location:
     """The `cores_required` attribute indicates how many uplink
     cores this switch requires - usually 1 bidi link in our case."""
 
@@ -47,8 +47,8 @@ class Switch:
 class Link:
     def __init__(
         self,
-        from_switch: Switch,
-        to_switch: Switch,
+        from_location: Location,
+        to_location: Location,
         type: LinkType,
         length: int,
         cores: int,
@@ -56,8 +56,8 @@ class Link:
         deployed: bool,
         fibre_name: Optional[str],
     ):
-        self.from_switch = from_switch
-        self.to_switch = to_switch
+        self.from_location = from_location
+        self.to_location = to_location
         self.type = type
         self.length = length
         self.cores = cores
@@ -68,7 +68,9 @@ class Link:
 
     def __repr__(self) -> str:
         return "<Link {from_switch} -> {to_switch} ({type})>".format(
-            from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
+            from_switch=self.from_location,
+            to_switch=self.to_location,
+            type=self.type.value,
         )
 
 
@@ -78,11 +80,11 @@ class LogicalLink:
     patched/coupled through an intermediate location.
     """
 
-    def __init__(self, from_switch: Switch, to_switch: Switch, type):
-        self.from_switch = from_switch
-        self.to_switch = to_switch
+    def __init__(self, from_location: Location, to_location: Location, type):
+        self.from_location = from_location
+        self.to_location = to_location
         self.type = type
-        self.physical_links = []
+        self.physical_links: list[Link] = []
 
     @property
     def total_length(self) -> float:
@@ -111,5 +113,7 @@ class LogicalLink:
 
     def __repr__(self):
         return "<LogicalLink {from_switch} -> {to_switch} ({type})>".format(
-            from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
+            from_switch=self.from_location,
+            to_switch=self.to_location,
+            type=self.type.value,
         )
