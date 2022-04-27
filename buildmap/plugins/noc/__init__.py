@@ -543,12 +543,12 @@ class NocPlugin(object):
         if not os.path.isdir(out_path):
             os.makedirs(out_path)
 
-        # switches.csv
-        with open(os.path.join(out_path, "switches.csv"), "w") as switches_file:
+        # locations.csv
+        with open(os.path.join(out_path, "locations.csv"), "w") as switches_file:
             writer = csv.writer(switches_file)
-            writer.writerow(["Switch-Name"])
+            writer.writerow(["Location"])
             for switch in sorted(self.switches.values()):
-                writer.writerow(switch)
+                writer.writerow([switch])
 
         # links.csv
         with open(os.path.join(out_path, "links.csv"), "w") as links_file:
