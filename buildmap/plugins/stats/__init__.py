@@ -28,7 +28,7 @@ class StatsPlugin(object):
 
         for layer in self.opts.get("count", []):
             count = self.db.execute(
-                text("SELECT count(*) FROM %s WHERE layer = '%s'" % (table, layer))
+                text("SELECT count(*) FROM %s WHERE layer = '%s' AND ST_GeometryType(wkb_geometry) IN ('ST_Line' ,'ST_LineString' ,'ST_MultiLineString')" % (table, layer))
             ).first()
             stats["count"].append((layer, count[0]))
 
