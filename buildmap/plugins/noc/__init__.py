@@ -152,8 +152,13 @@ class NocPlugin(object):
             return None
         elif len(switch_rows) > 1:
             self._warning(
-                "Link 0x%s on %s layer %ss at multiple switches"
-                % (edge_entityhandle, edge_layer, start_or_end)
+                "Link 0x%s on %s layer %ss at multiple switches (%s)"
+                % (
+                    edge_entityhandle,
+                    edge_layer,
+                    start_or_end,
+                    ", ".join(r[0] for r in switch_rows),
+                )
             )
             return None
 
