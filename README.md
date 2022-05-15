@@ -61,3 +61,9 @@ Credits
 
 * [Russ Garrett](https://github.com/russss) ([Electromagnetic Field](https://www.emfcamp.org))
 * [Redlizard](https://github.com/redlizard) (OHM2013 and SHA2017)
+
+* [Raleway](https://github.com/impallari/Raleway) fonts are licensed under the SIL Open Font License, Version 1.1.
+  This license is available at: http://scripts.sil.org/OFL
+  Copyright (c) 2010, Matt McInerney (matt@pixelspread.com),  
+  Copyright (c) 2011, Pablo Impallari (www.impallari.com|impallari@gmail.com),  
+  Copyright (c) 2011, Rodrigo Fuenzalida (www.rfuenzalida.com|hello@rfuenzalida.com), with Reserved Font Name Raleway  
