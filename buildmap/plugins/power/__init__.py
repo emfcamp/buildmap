@@ -5,6 +5,7 @@ import powerplan
 import os.path
 from powerplan.diagram import to_dot
 from powerplan.bom import generate_bom_html, generate_bom_csvs
+from powerplan.test_schedules import generate_schedule_html
 from collections import namedtuple
 from sqlalchemy.sql import text
 
@@ -242,6 +243,10 @@ class PowerPlugin(object):
 
         with open(os.path.join(out_path, "power-bom.html"), "w") as f:
             f.write(generate_bom_html(plan))
+
+
+        with open(os.path.join(out_path, "test-schedules.html"), "w") as f:
+            f.write(generate_schedule_html(plan))
 
         with open(os.path.join(out_path, "cables-bom.csv"), "w") as cables, open(
             os.path.join(out_path, "distros-bom.csv"), "w"
