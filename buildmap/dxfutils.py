@@ -7,7 +7,7 @@ def parse_attributes(rawcodevalues: list) -> dict:
 
     for attr in rawcodevalues:
         attr_id, val = attr.split(" ", 1)
-        if attr_id == "1000":
+        if attr_id == "1000" and ":" in val:
             key, val = val.split(":", 1)
             attributes[key] = val.replace("-", " ")
 
