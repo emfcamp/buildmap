@@ -113,7 +113,7 @@ class BuildMap(object):
                     "-lco",
                     "GEOMETRY_NAME=wkb_geometry",
                     "-overwrite",
-                    f"PG:{self.db.url}?application_name=buildmap",
+                    f"PG:{self.db.url.render_as_string(False)}?application_name=buildmap",
                     dxf,
                 ]
             )
