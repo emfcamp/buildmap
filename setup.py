@@ -25,7 +25,7 @@ setup(
     install_requires=[
         "jinja2",
         "gunicorn",
-        "sqlalchemy",
+        "sqlalchemy <2.0",
         "shapely",
         "pyyaml",
         "argparse",
