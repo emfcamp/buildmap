@@ -147,6 +147,10 @@ class TegolaExporter(Exporter):
             "providers": [provider],
             "maps": [m],
         }
+
+        if "uri_prefix" in self.config:
+            data["webserver"] = {"uri_prefix": self.config["uri_prefix"]}
+
         return data
 
     def get_layer_sql(self, table_name, layer_name, geometry_type):
