@@ -129,21 +129,26 @@ class BuildMap(object):
         """
         results = []
         seen_layers = set()
+
         for table_name, source_file in self.config["source_file"].items():
             layer_order = source_file.get("layers", {})
+            rename_layers = source_file.get("rename_layers", {})
             file_layers = self.db.get_layers(table_name)
 
             for layer in layer_order:
+                layer = rename_layers.get(layer, layer)
                 if layer in file_layers and layer not in seen_layers:
                     seen_layers.add(layer)
                     results.append((table_name, layer))
 
         for table_name, source_file in self.config["source_file"].items():
+            rename_layers = source_file.get("rename_layers", {})
             file_layers = self.db.get_layers(table_name)
             # If we're configured to auto-import layers, add layers without a
             # defined order to the bottom of the layer order stack
             if source_file.get("auto_import_layers", False):
                 for layer in file_layers:
+                    layer = rename_layers.get(layer, layer)
                     if layer not in seen_layers:
                         seen_layers.add(layer)
                         results.insert(0, (table_name, layer))
@@ -226,6 +231,8 @@ class BuildMap(object):
                 self.db.force_polygon(table, layer)
             for layer in tconfig.get("smooth", []):
                 self.db.smooth(table, layer)
+            for layer_src, layer_dst in tconfig.get("rename_layers", {}).items():
+                self.db.rename_layer(table, layer_src, layer_dst)
             self.known_attributes[table] |= self.db.extract_attributes(table)
 
         self.db.create_bounding_layer("bounding_box", self.get_bbox())

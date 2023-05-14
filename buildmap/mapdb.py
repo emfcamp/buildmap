@@ -318,5 +318,17 @@ class MapDB(object):
         )
         return [row[0] for row in result]
 
+    def rename_layer(self, table_name: str, layer_from: str, layer_to: str):
+        """Rename a layer in a table"""
+        with self.conn.begin():
+            self.conn.execute(
+                text(
+                    "UPDATE %s SET layer = :layer_to WHERE layer = :layer_from"
+                    % table_name
+                ),
+                layer_from=layer_from,
+                layer_to=layer_to,
+            )
+
     def execute(self, query, *args, **kwargs):
         return self.conn.execute(query, *args, **kwargs)
