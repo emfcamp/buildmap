@@ -9,6 +9,13 @@ def strip_srid(srid):
     return int(srid.replace("epsg:", ""))
 
 
+type_mapping = {
+    "multilinestring": "linestring",
+    "multipolygon": "polygon",
+    "multipoint": "point",
+}
+
+
 class TegolaExporter(Exporter):
     """Generate config for Tegola, which is a Mapbox Vector Tiles server.
 
@@ -42,8 +49,9 @@ class TegolaExporter(Exporter):
             # We can handle those in get_layer_sql
             types = self.db.get_layer_type(table_name, layer_name)
             if len(types) == 1:
-                typename = types[0].split("_")[1]
-                layer_name_typ = layer_name + "_" + typename.lower()
+                typename = types[0].split("_")[1].lower()
+                typename = type_mapping.get(typename, typename)
+                layer_name_typ = layer_name + "_" + typename
                 if sanitise_layer(layer_name_typ) in seen:
                     continue
                 seen.add(sanitise_layer(layer_name_typ))
@@ -56,8 +64,9 @@ class TegolaExporter(Exporter):
             else:
                 # Multiple simple types. Split them into different layers.
                 for typ in types:
-                    typename = typ.split("_")[1]
-                    layer_name_typ = layer_name + "_" + typename.lower()
+                    typename = typ.split("_")[1].lower()
+                    typename = type_mapping.get(typename, typename)
+                    layer_name_typ = layer_name + "_" + typename
                     if sanitise_layer(layer_name_typ) in seen:
                         continue
                     seen.add(sanitise_layer(layer_name_typ))
