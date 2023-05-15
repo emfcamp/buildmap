@@ -288,7 +288,7 @@ class MapDB(object):
         """Force all linestring objects in a layer to be polygons by
         calculating their concave hull. Handy for dealing with messy CAD files."""
         with self.conn.begin():
-            sql = """UPDATE {table} SET wkb_geometry = ST_ConcaveHull(wkb_geometry, 0.9)
+            sql = """UPDATE {table} SET wkb_geometry = ST_ConcaveHull(wkb_geometry, 1)
                         WHERE ST_Geometrytype(wkb_geometry) IN ('ST_LineString', 'ST_MultiLineString')
                         AND layer = '{layer}'""".format(
                 table=table_name, layer=layer_name
