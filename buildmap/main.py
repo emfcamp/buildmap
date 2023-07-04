@@ -219,9 +219,23 @@ class BuildMap(object):
             "Map bounds (N, E, S, W): %s", list(reversed(self.get_bbox().bounds))
         )
 
+        source_srid = self.config["source_projection"].split(":")[1]
+
         # Do some data transformation on the PostGIS table
         self.log.info("Transforming data...")
+        self.db.create_bounding_layer("bounding_box", self.get_bbox())
+
         for table, tconfig in self.config["source_file"].items():
+            # Remove entities which don't intersect the provided bounding box.
+            # If there's a manually-supplied bounding box this allows us to strip out stuff which we don't want,
+            # such as construction objects placed outside the map
+            self.db.execute(
+                f"""DELETE FROM {table} WHERE
+                    NOT ST_Intersects(
+                        wkb_geometry,
+                        ST_Transform((SELECT wkb_geometry FROM bounding_box LIMIT 1), {source_srid})
+                    )"""
+            )
             for layer in tconfig.get("combine_lines", []):
                 self.db.combine_lines(table, layer)
             self.db.clean_layers(table)
@@ -234,8 +248,6 @@ class BuildMap(object):
             for layer_src, layer_dst in tconfig.get("rename_layers", {}).items():
                 self.db.rename_layer(table, layer_src, layer_dst)
             self.known_attributes[table] |= self.db.extract_attributes(table)
-
-        self.db.create_bounding_layer("bounding_box", self.get_bbox())
 
         for plugin, opts in self.config.get("plugins", {}).items():
             try:
