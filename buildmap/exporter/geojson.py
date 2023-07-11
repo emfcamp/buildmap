@@ -12,7 +12,7 @@ class GeoJSONExporter(Exporter):
         start_time = time.time()
         self.log.info("Exporting vector layers...")
         self.source_tables = dict(
-            (table, layer) for layer, table in self.buildmap.source_layers
+            (table, layer) for layer, table in self.buildmap.get_source_layers()
         )
         self.output_dir = os.path.join(self.config["web_directory"], "vector")
 
@@ -98,7 +98,7 @@ class GeoJSONExporter(Exporter):
         source_table = self.source_tables[source_layers[0]]
 
         attributes = self.buildmap.known_attributes[source_table] | set(
-            ["entityhandle", "subclasses"]
+            ["entityhandle"]
         )
         attributes_str = ",".join(attributes)
         if len(attributes) > 0:
