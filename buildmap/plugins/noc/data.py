@@ -2,14 +2,16 @@ from typing import Optional
 from decimal import Decimal
 from functools import total_ordering
 from enum import Enum
-from . import unit
+import pint
+
+unit = pint.UnitRegistry()
 
 COUPLER_LOSS = Decimal("0.2")
 FIBRE_LOSS = Decimal("0.5")
 CONNECTOR_LOSS = Decimal("0.1")
 
 
-class LinkType(Enum):
+class LinkType():
     Copper = "copper"
     Fibre = "fibre"
 
