@@ -11,8 +11,13 @@ from .util import unit, get_col
 from .data import LinkType, Location, LogicalLink, Link
 
 
-class NocPlugin(object):
+def get_col(row, column, default=None):
+    if column in row and row[column] is not None:
+        return row[column]
+    return default
 
+
+class NocPlugin(object):
     # Tolerance for how close a link must be to a switch to consider that it connects (metres)
     BUFFER = 1
 
@@ -183,12 +188,17 @@ class NocPlugin(object):
             to_location = self._find_location_from_link(
                 row["entityhandle"], row["layer"], row["ogc_fid"], "end"
             )
-            if not from_location or not to_location:
-                continue
+            # if not from_location or not to_location:
+            #    continue
 
             # self.log.info("Link from %s to %s" % (from_switch, to_switch))
 
             type = self.link_layers[row["layer"]]
+            self.log.info(
+                "Link from %s to %s %s meter"
+                % (from_location, to_location, row["length"])
+            )
+
             length = row["length"] * unit.meter
             if "updowns" in row and row["updowns"] is not None:
                 length += int(row["updowns"]) * self.UPDOWN_LENGTH
@@ -197,10 +207,10 @@ class NocPlugin(object):
                 cores = int(row["cores"])
             else:
                 self._warning(
-                    "%s link from %s to %s had no cores, assuming 1"
-                    % (type.value.title(), from_location, to_location)
+                    "%s link from %s to %s had no cores, assuming 2"
+                    % (type.title(), from_location, to_location)
                 )
-                cores = 1
+                cores = 2
 
             yield Link(
                 from_location=from_location,
@@ -233,7 +243,8 @@ class NocPlugin(object):
         for link in self.links:
             if link.from_location == location:
                 self.processed_links.add(link)  # Mark it as being correctly ordered
-                self.order_links_from_location(link.to_location)
+                if not link.to_location.name.startswith("NOC DC"):
+                    self.order_links_from_location(link.to_location)
 
     def _validate_child_link_cores(self, location: Location):
         cores = (
@@ -273,7 +284,6 @@ class NocPlugin(object):
             if link.to_location == location:
                 # If we're extending:
                 if logical_link.type is not None:
-
                     # We can't extend to a different medium
                     if link.type != logical_link.type:
                         self.log.info(
@@ -324,7 +334,7 @@ class NocPlugin(object):
         # Validate that all fibre links have sufficient cores for all downstream links
         # Each incoming fibre to a switch should have (1+sum(child_fibre_links.cores))
 
-        self._validate_child_link_cores(root_switch)
+        # self._validate_child_link_cores(root_switch)
 
         # Create the logical links
         # We assume that any switch that is fibre in and fibre out is simply patched through with a coupler,
@@ -344,15 +354,15 @@ class NocPlugin(object):
         # (b) If incoming is fibre, a single logical link to the highest parent that is either core or doesn't
         #     itself have incoming fibre
 
-        for switch in self.locations.values():
-            if switch != root_switch:
-                logical_link = LogicalLink(None, switch, None)
-                self._make_logical_link(switch, logical_link)
-                if logical_link.type is None:
-                    self._warning("Unable to trace logical uplink for %s" % switch)
-                    continue
+        # for switch in self.switches.values():
+        #    if switch != root_switch:
+        #        logical_link = LogicalLink(None, switch, None)
+        #        self._make_logical_link(switch, logical_link)
+        #        if logical_link.type is None:
+        #            self._warning("Unable to trace logical uplink for %s" % switch)
+        #            continue
 
-                self.logical_links.append(logical_link)
+        #        self.logical_links.append(logical_link)
 
         return True
 
@@ -459,19 +469,19 @@ class NocPlugin(object):
         return colour, label
 
     def _create_base_dot(self, subheading):
-        dot = pydot.Dot("NOC", graph_type="digraph", strict=True)
-        dot.set_prog("neato")
+        dot = pydot.Dot("NOC", graph_type="graph", strict=True)
+        dot.set_prog("fdp")
         dot.set_node_defaults(shape="none", fontsize=14, margin=0, fontname="Arial")
         dot.set_edge_defaults(fontsize=13, fontname="Arial")
         # dot.set_page('11.7,8.3!')
         # dot.set_margin(0.5)
         # dot.set_ratio('fill')
-        dot.set_rankdir("LR")
+        dot.set_rankdir("TB")
         dot.set_fontname("Arial")
         dot.set_nodesep(0.3)
         dot.set_splines("spline")
 
-        sg = pydot.Cluster()  # 'physical', label='Physical')
+        sg = pydot.Cluster(rank="min")  # 'physical', label='Physical')
         # sg.set_color('gray80')
         sg.set_style("invis")
         # sg.set_labeljust('l')
@@ -491,13 +501,25 @@ class NocPlugin(object):
     def create_physical_dot(self):
         self.log.info("Generating physical graph")
         dot, sg = self._create_base_dot("NOC Physical")
-
         for switch in self.locations.values():
+            rank = "same"
             node = pydot.Node(switch.name, label=self._switch_label(switch))
-            sg.add_node(node)
+            if switch.name == "NOC DC2":
+                sg2 = pydot.Cluster(rank="sink")  # 'physical', label='Physical')
+                sg2.add_node(node)
+                dot.add_subgraph(sg2)
+            elif switch.name == "NOC DC":
+                sg2 = pydot.Cluster(rank="source")  # 'physical', label='Physical')
+                sg2.add_node(node)
+                dot.add_subgraph(sg2)
+            else:
+                sg.add_node(node)
 
         for link in self.links:
-            edge = pydot.Edge(link.from_location.name, link.to_location.name)
+            #           if link.to_switch.name == "NOC DC2":
+            edge = pydot.Edge(link.to_location.name, link.from_location.name)
+            #            else:
+            #                edge = pydot.Edge(link.to_switch.name, link.from_location.name)
 
             colour, label = self._physical_link_label_and_colour(link)
             if label is None:
@@ -541,10 +563,7 @@ class NocPlugin(object):
         return dot
 
     def get_link_medium(self, link: Link):
-        if link.type == LinkType.Copper:
-            if link.length <= self.LENGTH_COPPER_NOT_CCA:
-                return "CCA"
-        return link.type.value.title()
+        return link.type.title()
 
     def _write_stats(self, stats_file):
         # Physical links
