@@ -33,6 +33,8 @@ setup(
         "toml",
         "pydotplus",
         "pint==0.18",
+        "reportlab",
+        "pylabels",
     ],
     entry_points={"console_scripts": {"buildmap=buildmap.main:run"}},
 )
