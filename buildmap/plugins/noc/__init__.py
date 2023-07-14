@@ -1,6 +1,5 @@
 import logging
 import time
-import os.path
 import pydotplus as pydot  # type: ignore
 import csv
 import html
@@ -635,21 +634,18 @@ class NocPlugin(object):
             return
         self.log.info("Plan generated in %.2f seconds", time.time() - start)
 
-        out_path = os.path.join(
-            self.buildmap.resolve_path(self.buildmap.config["web_directory"]), "noc"
+        out_path = (
+            self.buildmap.resolve_path(self.buildmap.config["web_directory"]) / "noc"
         )
+        out_path.mkdir(parents=True, exist_ok=True)
 
-        if not os.path.isdir(out_path):
-            os.makedirs(out_path)
-
-        with open(os.path.join(out_path, "locations.csv"), "w") as locations_file:
+        with (out_path / "locations.csv").open("w") as locations_file:
             writer = csv.writer(locations_file)
             writer.writerow(["Location-Name"])
             for location in sorted(self.locations.values()):
                 writer.writerow([location.name])
 
-        # links.csv
-        with open(os.path.join(out_path, "links.csv"), "w") as links_file:
+        with (out_path / "links.csv").open("w") as links_file:
             writer = csv.writer(links_file)
             writer.writerow(
                 ["From-Location", "To-Location", "Type", "Subtype", "Length", "Cores"]
@@ -666,8 +662,7 @@ class NocPlugin(object):
                     ]
                 )
 
-        # links-logical.csv
-        with open(os.path.join(out_path, "links-logical.csv"), "w") as links_file:
+        with (out_path / "links-logical.csv").open("w") as links_file:
             writer = csv.writer(links_file)
             writer.writerow(
                 ["From-Location", "To-Location", "Type", "Total-Length", "Couplers"]
@@ -683,24 +678,21 @@ class NocPlugin(object):
                     ]
                 )
 
-        # warnings.txt
-        with open(os.path.join(out_path, "warnings.txt"), "w") as warnings_file:
+        with (out_path / "warnings.txt").open("w") as warnings_file:
             warnings_file.writelines("\n".join(self.warnings))
 
-        # stats.txt
-        with open(os.path.join(out_path, "stats.txt"), "w") as stats_file:
+        with (out_path / "stats.txt").open("w") as stats_file:
             self._write_stats(stats_file)
 
-        # noc-physical.pdf
         physical_dot = self.create_physical_dot()
         if not physical_dot:
             return
-        with open(os.path.join(out_path, "noc-physical.pdf"), "wb") as f:
+        with (out_path / "noc-physical.pdf").open("wb") as f:
             f.write(physical_dot.create_pdf())
 
         # noc-logical.pdf
         logical_dot = self.create_logical_dot()
         if not logical_dot:
             return
-        with open(os.path.join(out_path, "noc-logical.pdf"), "wb") as f:
+        with (out_path / "noc-logical.pdf").open("wb") as f:
             f.write(logical_dot.create_pdf())

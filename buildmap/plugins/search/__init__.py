@@ -1,13 +1,15 @@
-import os.path
 import json
 from sqlalchemy import text
 from shapely import wkt
+from pathlib import Path
+from ...main import BuildMap
+from ...mapdb import MapDB
 
 
 class SearchPlugin(object):
     """Generate a JSON search index file to power JS search"""
 
-    def __init__(self, buildmap, _config, opts, db):
+    def __init__(self, buildmap: BuildMap, _config, opts, db: MapDB):
         self.db = db
         self.buildmap = buildmap
         self.opts = opts
@@ -51,14 +53,13 @@ class SearchPlugin(object):
     def run(self):
         data = self.get_data()
 
-        out_path = os.path.join(
-            self.buildmap.resolve_path(self.buildmap.config["web_directory"]), "search"
+        out_path = self.buildmap.resolve_path(
+            self.opts.get(
+                "output_path",
+                Path(self.buildmap.config["web_directory"]) / "search" / "search.json",
+            )
         )
+        out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        try:
-            os.makedirs(out_path)
-        except FileExistsError:
-            pass
-
-        with open(os.path.join(out_path, "search.json"), "w") as f:
+        with out_path.open("w") as f:
             json.dump(data, f)

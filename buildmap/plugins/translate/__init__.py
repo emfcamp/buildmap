@@ -45,16 +45,15 @@ class TranslatePlugin(object):
         )
 
         for orig, translated in translations.items():
-            for layer in self.opts.get("layers", []):
-                self.db.execute(
-                    text(
-                        "UPDATE {table} SET {col} = :translated WHERE text = :orig".format(
-                            table=table, col=trans_col
-                        )
-                    ),
-                    translated=translated,
-                    orig=orig,
-                )
+            self.db.execute(
+                text(
+                    "UPDATE {table} SET {col} = :translated WHERE text = :orig".format(
+                        table=table, col=trans_col
+                    )
+                ),
+                translated=translated,
+                orig=orig,
+            )
 
         self.buildmap.known_attributes[table].add(trans_col)
 

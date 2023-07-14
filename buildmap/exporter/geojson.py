@@ -1,5 +1,4 @@
 import json
-import os
 import time
 from sqlalchemy import text
 from . import Exporter
@@ -14,12 +13,11 @@ class GeoJSONExporter(Exporter):
         self.source_tables = dict(
             (table, layer) for layer, table in self.buildmap.get_source_layers()
         )
-        self.output_dir = os.path.join(self.config["web_directory"], "vector")
+        self.output_dir = (
+            self.buildmap.resolve_path(self.config["web_directory"]) / "vector"
+        )
 
-        try:
-            os.mkdir(self.output_dir)
-        except OSError:
-            pass
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
         for layer in self.config["vector_layer"]:
             layer_name = layer["name"]
@@ -140,7 +138,9 @@ class GeoJSONExporter(Exporter):
             "features": result,
         }
 
-        with open(os.path.join(self.output_dir, "%s.json" % name), "w") as fp:
+        output_path = self.output_dir / ("%s.json" % name)
+
+        with output_path.open("w") as fp:
             json.dump(geojson, fp, indent=4)
 
     def generate_layer_index(self):
@@ -156,9 +156,13 @@ class GeoJSONExporter(Exporter):
             )
 
         data = {"layers": vector_layers, "styles": self.generate_styles()}
-        with open(
-            os.path.join(self.config["web_directory"], "vector_layers.json"), "w"
-        ) as fp:
+
+        output_path = (
+            self.buildmap.resolve_path(self.config["web_directory"])
+            / "vector_layers.json"
+        )
+
+        with output_path.open("w") as fp:
             json.dump(data, fp, indent=4)
 
     def generate_styles(self):

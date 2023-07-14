@@ -10,7 +10,9 @@ import argparse
 import importlib
 from json.decoder import JSONDecodeError
 from collections import defaultdict
+from typing import Union
 from shapely.geometry import MultiPolygon, Polygon
+from pathlib import Path
 
 from .util import sanitise_layer
 from .mapdb import MapDB
@@ -61,15 +63,11 @@ class BuildMap(object):
         self.bbox = None
 
         # Resolve any relative paths with respect to the first config file
-        self.base_path = os.path.dirname(os.path.abspath(self.args.config[0]))
+        self.base_path = Path(self.args.config[0]).absolute().parent
         self.temp_dir = self.resolve_path(self.config["output_directory"])
         self.known_attributes = defaultdict(set)
         shutil.rmtree(self.temp_dir, True)
-        try:
-            os.makedirs(self.temp_dir)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
 
     def load_config(self, config_files):
         config = {}
@@ -81,12 +79,12 @@ class BuildMap(object):
                 raise Exception("Error loading config file {}: {}".format(filename, e))
         return config
 
-    def resolve_path(self, path):
-        return os.path.normpath(os.path.join(self.base_path, path))
+    def resolve_path(self, path: Union[str, Path]) -> Path:
+        return self.base_path / path
 
-    def import_dxf(self, dxf, table_name):
+    def import_dxf(self, dxf: Path, table_name: str):
         """Import the DXF into Postgres into the specified table name, overwriting the existing table."""
-        if not os.path.isfile(dxf):
+        if not dxf.is_file():
             raise Exception("Source DXF file %s does not exist" % dxf)
 
         self.log.info("Importing %s into PostGIS table %s...", dxf, table_name)
