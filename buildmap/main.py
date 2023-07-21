@@ -14,7 +14,7 @@ from typing import Union
 from shapely.geometry import MultiPolygon, Polygon
 from pathlib import Path
 
-from .util import sanitise_layer
+from .util import sanitise_layer, build_options
 from .mapdb import MapDB
 from . import plugins  # noqa
 
@@ -82,39 +82,39 @@ class BuildMap(object):
     def resolve_path(self, path: Union[str, Path]) -> Path:
         return self.base_path / path
 
-    def import_dxf(self, dxf: Path, table_name: str):
-        """Import the DXF into Postgres into the specified table name, overwriting the existing table."""
-        if not dxf.is_file():
-            raise Exception("Source DXF file %s does not exist" % dxf)
+    def import_file(self, path: Path, table_name: str):
+        """Import a geo file into Postgres into the specified table name, overwriting the existing table."""
+        if not path.is_file():
+            raise Exception("Source file %s does not exist" % path)
 
-        self.log.info("Importing %s into PostGIS table %s...", dxf, table_name)
+        ogr_opts = {
+            "-t_srs": self.config["source_projection"],
+            "-nln": table_name,
+            "-f": "PostgreSQL",
+            "-lco": "GEOMETRY_NAME=wkb_geometry",
+            "-overwrite": None,
+        }
+
+        if path.suffix.lower() == ".dxf":
+            ogr_opts["-s_srs"] = self.config["source_projection"]
+            ogr_opts["--config"] = [
+                ["DXF_ENCODING", "UTF-8"],
+                ["DXF_INCLUDE_RAW_CODE_VALUES", "TRUE"],
+            ]
+            ogr_opts["-sql"] = "SELECT *, OGR_STYLE FROM entities"
+
+        command = (
+            ["ogr2ogr"]
+            + list(build_options(ogr_opts))
+            + [
+                f"PG:{self.db.url.render_as_string(False)}?application_name=buildmap",
+                path,
+            ]
+        )
+
+        self.log.info("Importing %s into PostGIS table %s...", path, table_name)
         try:
-            subprocess.check_call(
-                [
-                    "ogr2ogr",
-                    "--config",
-                    "DXF_ENCODING",
-                    "UTF-8",
-                    "--config",
-                    "DXF_INCLUDE_RAW_CODE_VALUES",
-                    "TRUE",
-                    "-s_srs",
-                    self.config["source_projection"],
-                    "-t_srs",
-                    self.config["source_projection"],
-                    "-sql",
-                    "SELECT *, OGR_STYLE FROM entities",
-                    "-nln",
-                    table_name,
-                    "-f",
-                    "PostgreSQL",
-                    "-lco",
-                    "GEOMETRY_NAME=wkb_geometry",
-                    "-overwrite",
-                    f"PG:{self.db.url.render_as_string(False)}?application_name=buildmap",
-                    dxf,
-                ]
-            )
+            subprocess.check_call(command)
         except OSError as e:
             self.log.error("Unable to run ogr2ogr: %s", e)
             sys.exit(1)
@@ -211,7 +211,7 @@ class BuildMap(object):
                 self.log.error("No path found for source %s", table_name)
                 return
             path = self.resolve_path(source_file_data["path"])
-            self.import_dxf(path, table_name)
+            self.import_file(path, table_name)
 
         self.log.info(
             "Map bounds (N, E, S, W): %s", list(reversed(self.get_bbox().bounds))
@@ -225,8 +225,10 @@ class BuildMap(object):
 
         for table, tconfig in self.config["source_file"].items():
             # Remove entities which don't intersect the provided bounding box.
-            # If there's a manually-supplied bounding box this allows us to strip out stuff which we don't want,
+            # If there's a manually-supplied bounding box this allows us to crop out stuff which we don't want,
             # such as construction objects placed outside the map
+
+            # TODO: allow per-file bounding boxes here, as we may want to crop some inputs differently from others.
             self.db.execute(
                 f"""DELETE FROM {table} WHERE
                     NOT ST_Intersects(
