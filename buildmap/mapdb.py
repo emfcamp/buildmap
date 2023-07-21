@@ -6,6 +6,8 @@ from time import sleep
 from shapely import wkt
 from sqlalchemy.sql import text
 
+from buildmap.input import Input
+
 from .dxfutils import parse_attributes
 
 
@@ -57,12 +59,27 @@ class MapDB(object):
         self.log.info("Connected to PostGIS database %s", self.url)
         return True
 
-    def extract_attributes(self, table):
-        """Extract DXF extended attributes into columns so we can use them in Mapnik"""
-        with self.conn.begin():
-            return self.extract_attributes_for_table(table)
+    def extract_attributes(self, input_file: Input) -> set[str]:
+        """Extract all the attributes for a table, returning them as a set."""
+        if input_file.file_type == "dxf":
+            # DXF files require special treatment
+            with self.conn.begin():
+                return self.extract_dxf_attributes(input_file.table)
+        else:
+            # Just get all the columns and remove the ones we don't want
+            res = set(
+                row[0]
+                for row in self.conn.execute(
+                    text(
+                        "SELECT column_name FROM information_schema.columns WHERE table_name = :table_name"
+                    ),
+                    table_name=input_file.table,
+                )
+            )
+            res -= {"ogc_fid", "wkb_geometry", "layer"}
+            return res
 
-    def extract_attributes_for_table(self, table_name):
+    def extract_dxf_attributes(self, table_name):
         """Extract the DXF's XDATA attributes into individual columns.
 
         We use GDAL's "DXF_INCLUDE_RAW_CODE_VALUES" option which includes
@@ -140,7 +157,7 @@ class MapDB(object):
                 )
             )
 
-    def clean_layers(self, table_name):
+    def clean_dxf_table(self, table_name):
         """Tidy up some mess in Postgres which ogr2ogr makes when importing DXFs."""
         with self.conn.begin():
             # Fix newlines in labels and trim whitespace
@@ -183,15 +200,30 @@ class MapDB(object):
             self.conn.execute(
                 text("ALTER TABLE %s DROP COLUMN subclasses" % table_name)
             )
+            self.clean_weird_unicode(table_name)
+
+    def optimise_table(self, table_name):
+        with self.conn.begin():
             # Create layer index to speed up querying
             self.conn.execute(
                 text("CREATE INDEX %s_layer on %s(layer)" % (table_name, table_name))
             )
-            self.clean_weird_unicode(table_name)
-
         self.conn.execution_options(isolation_level="AUTOCOMMIT").execute(
             text("VACUUM ANALYZE %s" % table_name)
         )
+
+    def add_single_layer_column(self, table_name):
+        """Add a layer column containing the name of the table, to align single-layer
+        tables (e.g. GeoJSON) with DXF tables.
+        """
+        with self.conn.begin():
+            self.conn.execute(text("ALTER TABLE %s ADD COLUMN layer TEXT" % table_name))
+            self.conn.execute(
+                text(
+                    "UPDATE %s SET layer = :table_name WHERE layer IS NULL" % table_name
+                ),
+                table_name=table_name,
+            )
 
     def clean_weird_unicode(self, table_name):
         """Sometimes text comes through as strange unicode in the format "\\U+00f6".

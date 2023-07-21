@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .util import sanitise_layer, build_options
 from .mapdb import MapDB
+from .input import Input
 from . import plugins  # noqa
 
 
@@ -82,20 +83,18 @@ class BuildMap(object):
     def resolve_path(self, path: Union[str, Path]) -> Path:
         return self.base_path / path
 
-    def import_file(self, path: Path, table_name: str):
+    def import_file(self, input_file: Input):
         """Import a geo file into Postgres into the specified table name, overwriting the existing table."""
-        if not path.is_file():
-            raise Exception("Source file %s does not exist" % path)
 
         ogr_opts = {
             "-t_srs": self.config["source_projection"],
-            "-nln": table_name,
+            "-nln": input_file.table,
             "-f": "PostgreSQL",
             "-lco": "GEOMETRY_NAME=wkb_geometry",
             "-overwrite": None,
         }
 
-        if path.suffix.lower() == ".dxf":
+        if input_file.file_type == "dxf":
             ogr_opts["-s_srs"] = self.config["source_projection"]
             ogr_opts["--config"] = [
                 ["DXF_ENCODING", "UTF-8"],
@@ -108,11 +107,13 @@ class BuildMap(object):
             + list(build_options(ogr_opts))
             + [
                 f"PG:{self.db.url.render_as_string(False)}?application_name=buildmap",
-                path,
+                input_file.path,
             ]
         )
 
-        self.log.info("Importing %s into PostGIS table %s...", path, table_name)
+        self.log.info(
+            "Importing %s into PostGIS table %s...", input_file.path, input_file.table
+        )
         try:
             subprocess.check_call(command)
         except OSError as e:
@@ -205,13 +206,13 @@ class BuildMap(object):
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
 
     def build_map(self):
-        #  Import each source DXF file into PostGIS
-        for table_name, source_file_data in self.config["source_file"].items():
-            if "path" not in source_file_data:
-                self.log.error("No path found for source %s", table_name)
-                return
-            path = self.resolve_path(source_file_data["path"])
-            self.import_file(path, table_name)
+        inputs = [
+            Input(self, table_name, conf)
+            for table_name, conf in self.config["source_file"].items()
+        ]
+        #  Import each source file into PostGIS
+        for input_file in inputs:
+            self.import_file(input_file)
 
         self.log.info(
             "Map bounds (N, E, S, W): %s", list(reversed(self.get_bbox().bounds))
@@ -223,31 +224,41 @@ class BuildMap(object):
         self.log.info("Transforming data...")
         self.db.create_bounding_layer("bounding_box", self.get_bbox())
 
-        for table, tconfig in self.config["source_file"].items():
+        for input_file in inputs:
             # Remove entities which don't intersect the provided bounding box.
             # If there's a manually-supplied bounding box this allows us to crop out stuff which we don't want,
             # such as construction objects placed outside the map
 
             # TODO: allow per-file bounding boxes here, as we may want to crop some inputs differently from others.
             self.db.execute(
-                f"""DELETE FROM {table} WHERE
+                f"""DELETE FROM {input_file.table} WHERE
                     NOT ST_Intersects(
                         wkb_geometry,
                         ST_Transform((SELECT wkb_geometry FROM bounding_box LIMIT 1), {source_srid})
                     )"""
             )
-            for layer in tconfig.get("combine_lines", []):
-                self.db.combine_lines(table, layer)
-            self.db.clean_layers(table)
-            if "handle_prefix" in tconfig:
-                self.db.prefix_handles(table, tconfig["handle_prefix"])
-            for layer in tconfig.get("force_polygon", []):
-                self.db.force_polygon(table, layer)
-            for layer in tconfig.get("smooth", []):
-                self.db.smooth(table, layer)
-            for layer_src, layer_dst in tconfig.get("rename_layers", {}).items():
-                self.db.rename_layer(table, layer_src, layer_dst)
-            self.known_attributes[table] |= self.db.extract_attributes(table)
+            for layer in input_file.config.get("combine_lines", []):
+                self.db.combine_lines(input_file.table, layer)
+            if input_file.file_type == "dxf":
+                self.db.clean_dxf_table(input_file.table)
+            elif input_file.file_type == "geojson":
+                self.db.add_single_layer_column(input_file.table)
+            self.db.optimise_table(input_file.table)
+            if "handle_prefix" in input_file.config:
+                self.db.prefix_handles(
+                    input_file.table, input_file.config["handle_prefix"]
+                )
+            for layer in input_file.config.get("force_polygon", []):
+                self.db.force_polygon(input_file.table, layer)
+            for layer in input_file.config.get("smooth", []):
+                self.db.smooth(input_file.table, layer)
+            for layer_src, layer_dst in input_file.config.get(
+                "rename_layers", {}
+            ).items():
+                self.db.rename_layer(input_file.table, layer_src, layer_dst)
+            self.known_attributes[input_file.table] |= self.db.extract_attributes(
+                input_file
+            )
 
         for plugin, opts in self.config.get("plugins", {}).items():
             try:
