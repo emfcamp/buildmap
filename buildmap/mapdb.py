@@ -80,7 +80,8 @@ class MapDB(object):
             return res
 
     def extract_dxf_attributes(self, table_name):
-        """Extract the DXF's XDATA attributes into individual columns.
+        """Extract the DXF's XDATA attributes into individual columns, and
+            return a set of all attribute column names.
 
         We use GDAL's "DXF_INCLUDE_RAW_CODE_VALUES" option which includes
         the raw values of any unparsed attributes in the `rawcodevalues` column,
@@ -115,7 +116,7 @@ class MapDB(object):
                     value=value,
                     fid=ogc_fid,
                 )
-        return known_attributes
+        return known_attributes | {"text", "entityhandle"}
 
     def get_bounds(self, table_name, srs=4326):
         """Fetch the bounding box of all rows within a table."""

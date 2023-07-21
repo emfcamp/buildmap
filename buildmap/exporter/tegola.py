@@ -173,9 +173,7 @@ class TegolaExporter(Exporter):
         """
         geom_field = "wkb_geometry"
         fid_field = "ogc_fid"
-        additional_fields = ["text", "entityhandle"] + list(
-            self.buildmap.known_attributes[table_name]
-        )
+        additional_fields = list(self.buildmap.known_attributes[table_name])
 
         for type_name in ("LineString", "Polygon"):
             if geometry_type == "ST_Multi{}".format(type_name):
