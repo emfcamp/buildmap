@@ -16,16 +16,20 @@ class SearchPlugin(object):
 
     def get_data(self):
         data = []
-        table = "site_plan"
 
-        for layer in self.opts.get("layers", []):
-            cols = ["text"]
+        for table, layer in self.buildmap.get_source_layers():
+            if layer not in self.opts.get("layers", []):
+                continue
+
+            cols = ["text"] + self.opts.get("columns", [])
             # Add any translated columns
             cols += [
                 attr
                 for attr in self.buildmap.known_attributes[table]
                 if attr.startswith("text_")
             ]
+            # Filter out columns which don't exist in the table
+            cols = set(cols) & set(self.buildmap.known_attributes[table])
 
             q = self.db.execute(
                 text(
