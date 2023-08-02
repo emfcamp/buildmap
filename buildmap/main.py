@@ -13,6 +13,7 @@ from collections import defaultdict
 from typing import Union
 from shapely.geometry import MultiPolygon, Polygon
 from pathlib import Path
+from mergedeep import merge
 
 from .util import sanitise_layer, build_options
 from .mapdb import MapDB
@@ -75,7 +76,7 @@ class BuildMap(object):
         for filename in config_files:
             try:
                 with open(filename, "r") as fp:
-                    config.update(json.load(fp))
+                    merge(config, json.load(fp))
             except JSONDecodeError as e:
                 raise Exception("Error loading config file {}: {}".format(filename, e))
         return config

@@ -32,6 +32,7 @@ setup(
         "psycopg2",
         "toml",
         "pydotplus",
+        "mergedeep==1.3.4",
         "pint==0.18",
     ],
     entry_points={"console_scripts": {"buildmap=buildmap.main:run"}},
