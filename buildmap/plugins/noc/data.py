@@ -11,7 +11,7 @@ FIBRE_LOSS = Decimal("0.5")
 CONNECTOR_LOSS = Decimal("0.1")
 
 
-class LinkType():
+class LinkType(Enum):
     Copper = "copper"
     Fibre = "fibre"
 
@@ -21,13 +21,20 @@ class Location:
     """The `cores_required` attribute indicates how many uplink
     cores this switch requires - usually 1 bidi link in our case."""
 
-    def __init__(self, name: str, cores_required: int = 1, deployed: bool = False):
+    def __init__(
+        self,
+        name: str,
+        handle: str,
+        cores_required: int = 1,
+        deployed: bool = False,
+    ):
         self.name = name
+        self.handle = handle
         self.cores_required = cores_required
         self.deployed = deployed
 
     def __repr__(self) -> str:
-        return "<Switch {}>".format(self.name)
+        return f"<Switch {self.name} (0x{self.handle})>"
 
     def __eq__(self, other):
         if type(other) != type(self):
@@ -51,16 +58,20 @@ class Link:
         self,
         from_location: Location,
         to_location: Location,
-        type: LinkType,
+        handle: str,
+        link_type: LinkType,
         length: int,
         cores: int,
         aggregated: bool,
         deployed: bool,
         fibre_name: Optional[str],
     ):
+        if type(link_type) != LinkType:
+            raise ValueError(f"Link type must be a LinkType enum, got {link_type}")
         self.from_location = from_location
         self.to_location = to_location
-        self.type = type
+        self.handle = handle
+        self.type = link_type
         self.length = length
         self.cores = cores
         self.cores_used = 0
@@ -69,11 +80,7 @@ class Link:
         self.deployed = deployed
 
     def __repr__(self) -> str:
-        return "<Link {from_switch} -> {to_switch} ({type})>".format(
-            from_switch=self.from_location,
-            to_switch=self.to_location,
-            type=self.type.value,
-        )
+        return f"<Link {self.from_location} -> {self.to_location} ({self.type.value}, handle 0x{self.handle})>"
 
 
 class LogicalLink:

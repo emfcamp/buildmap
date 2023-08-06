@@ -41,7 +41,7 @@ class NocPlugin(object):
         self.opts = opts
         self.buildmap = buildmap
         self.location_layer = None
-        self.link_layers = {}
+        self.link_layers: dict[str, LinkType] = {}
         self.locations = {}
         self.links: list[Link] = []
         self.processed_links = set()
@@ -117,6 +117,7 @@ class NocPlugin(object):
                 name = row["entityhandle"]
             yield Location(
                 name,
+                row["entityhandle"],
                 int(get_col(row, "cores_required", 1)),
                 get_col(row, "deployed") == "true",
             )
@@ -193,6 +194,7 @@ class NocPlugin(object):
             # self.log.info("Link from %s to %s" % (from_switch, to_switch))
 
             type = self.link_layers[row["layer"]]
+
             self.log.info(
                 "Link from %s to %s %s meter"
                 % (from_location, to_location, row["length"])
@@ -207,14 +209,15 @@ class NocPlugin(object):
             else:
                 self._warning(
                     "%s link from %s to %s had no cores, assuming 2"
-                    % (type.title(), from_location, to_location)
+                    % (type.value.title(), from_location, to_location)
                 )
                 cores = 2
 
             yield Link(
                 from_location=from_location,
                 to_location=to_location,
-                type=type,
+                handle=row["entityhandle"],
+                link_type=type,
                 length=length,
                 cores=cores,
                 deployed=get_col(row, "deployed") == "true",
@@ -515,11 +518,13 @@ class NocPlugin(object):
                 sg.add_node(node)
 
         for link in self.links:
-            #           if link.to_switch.name == "NOC DC2":
+            if not link.from_location:
+                self._warning(f"Link {link} has no from_location")
+                continue
+            if not link.to_location:
+                self._warning(f"Link {link} has no to_location")
+                continue
             edge = pydot.Edge(link.to_location.name, link.from_location.name)
-            #            else:
-            #                edge = pydot.Edge(link.to_switch.name, link.from_location.name)
-
             colour, label = self._physical_link_label_and_colour(link)
             if label is None:
                 return None
@@ -562,7 +567,7 @@ class NocPlugin(object):
         return dot
 
     def get_link_medium(self, link: Link):
-        return link.type.title()
+        return link.type.value.title()
 
     def _write_stats(self, stats_file):
         # Physical links
