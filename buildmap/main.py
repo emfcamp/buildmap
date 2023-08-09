@@ -8,6 +8,7 @@ import subprocess
 import time
 import argparse
 import importlib
+import requests
 from json.decoder import JSONDecodeError
 from collections import defaultdict
 from typing import Union
@@ -314,3 +315,15 @@ class BuildMap(object):
         else:
             self.log.error("Requested static layer (%s) not found", self.args.layer)
             return
+
+    def download(self, remote_path: str):
+        """Download a remote file into the temp directory, and return the path"""
+        file_name = remote_path.split("/")[-1]
+        self.log.info("Downloading %s...", remote_path)
+        with requests.get(remote_path, stream=True) as r:
+            r.raise_for_status()
+            with open(self.temp_dir / file_name, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+        return self.temp_dir / file_name
