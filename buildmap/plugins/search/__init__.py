@@ -17,39 +17,36 @@ class SearchPlugin(object):
     def get_data(self):
         data = []
 
-        for table, layer in self.buildmap.get_source_layers():
-            if layer not in self.opts.get("layers", []):
-                continue
+        layer_map = {layer: table for table, layer in self.buildmap.get_source_layers()}
 
-            cols = ["text"] + self.opts.get("columns", [])
-            # Add any translated columns
-            cols += [
-                attr
-                for attr in self.buildmap.known_attributes[table]
-                if attr.startswith("text_")
-            ]
-            # Filter out columns which don't exist in the table
+        for layer in self.opts.get("layers", []):
+            table = layer_map[layer["name"]]
+
+            cols = {layer["field"]} | set(layer.get("additional_columns", []))
             cols = set(cols) & set(self.buildmap.known_attributes[table])
 
             if len(cols) == 0:
                 raise ValueError("No searchable columns for layer %s" % layer)
 
-            if "text" not in cols:
-                raise ValueError("No 'text' column for layer %s" % layer)
-
             q = self.db.execute(
                 text(
                     """SELECT ST_AsText(ST_Transform(wkb_geometry, 4326)) AS geom, ogc_fid, %s
                         FROM %s
-                        WHERE layer = '%s' AND text IS NOT NULL AND text != ''"""
-                    % (",".join(cols), table, layer)
+                        WHERE layer = '%s' AND %s IS NOT NULL AND %s != ''"""
+                    % (
+                        ",".join(cols),
+                        table,
+                        layer["name"],
+                        layer["field"],
+                        layer["field"],
+                    )
                 )
             )
             for row in q:
                 point = wkt.loads(row["geom"])
                 record = {
-                    "gid": row["ogc_fid"],
-                    "layer": layer,
+                    "gid": f"{layer['name']}-{row['ogc_fid']}",
+                    "layer": layer["name"],
                     "position": [round(point.x, 5), round(point.y, 5)],
                 }
 
