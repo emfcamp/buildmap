@@ -31,6 +31,12 @@ class SearchPlugin(object):
             # Filter out columns which don't exist in the table
             cols = set(cols) & set(self.buildmap.known_attributes[table])
 
+            if len(cols) == 0:
+                raise ValueError("No searchable columns for layer %s" % layer)
+
+            if "text" not in cols:
+                raise ValueError("No 'text' column for layer %s" % layer)
+
             q = self.db.execute(
                 text(
                     """SELECT ST_AsText(ST_Transform(wkb_geometry, 4326)) AS geom, ogc_fid, %s
