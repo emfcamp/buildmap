@@ -1,4 +1,5 @@
 import json
+import logging
 from sqlalchemy import text
 from shapely import wkt
 from pathlib import Path
@@ -10,6 +11,7 @@ class SearchPlugin(object):
     """Generate a JSON search index file to power JS search"""
 
     def __init__(self, buildmap: BuildMap, _config, opts, db: MapDB):
+        self.log = logging.getLogger(__name__)
         self.db = db
         self.buildmap = buildmap
         self.opts = opts
@@ -43,7 +45,8 @@ class SearchPlugin(object):
                 )
             )
             for row in q:
-                point = wkt.loads(row["geom"])
+                geom = wkt.loads(row["geom"])
+                point = geom.representative_point()
                 record = {
                     "gid": f"{layer['name']}-{row['ogc_fid']}",
                     "layer": layer["name"],
@@ -67,6 +70,7 @@ class SearchPlugin(object):
             )
         )
         out_path.parent.mkdir(parents=True, exist_ok=True)
+        self.log.info("Generated search index with %s items", len(data))
 
         with out_path.open("w") as f:
             json.dump(data, f)
