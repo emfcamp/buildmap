@@ -27,7 +27,7 @@ class Input:
 
         path = self.buildmap.resolve_path(path)
         if not path.is_file():
-            raise Exception("Source file %s does not exist" % self.path)
+            raise Exception("Source file %s does not exist" % path)
         return path
 
     @property

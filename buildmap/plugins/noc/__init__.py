@@ -245,6 +245,9 @@ class NocPlugin(object):
         for link in self.links:
             if link.from_location == location:
                 self.processed_links.add(link)  # Mark it as being correctly ordered
+                if link.to_location is None:
+                    self._warning("Link %s has no to_location" % link)
+                    continue
                 if not link.to_location.name.startswith("NOC DC"):
                     self.order_links_from_location(link.to_location)
 
