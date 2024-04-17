@@ -190,15 +190,8 @@ class NocPlugin(object):
             )
             # if not from_location or not to_location:
             #    continue
-
-            # self.log.info("Link from %s to %s" % (from_switch, to_switch))
-
+            
             type = self.link_layers[row["layer"]]
-
-            self.log.info(
-                "Link from %s to %s %s meter"
-                % (from_location, to_location, row["length"])
-            )
 
             length = row["length"] * unit.meter
             if "updowns" in row and row["updowns"] is not None:
