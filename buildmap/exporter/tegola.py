@@ -112,7 +112,7 @@ class TegolaExporter(Exporter):
         }
 
         if (
-            type(self.config["mapbox_vector_layer"]) is dict
+            isinstance(self.config["mapbox_vector_layer"], dict)
             and "attribution" in self.config["mapbox_vector_layer"]
         ):
             m["attribution"] = self.config["mapbox_vector_layer"]["attribution"]
@@ -149,6 +149,22 @@ class TegolaExporter(Exporter):
                 "max_zoom": self.config["zoom_range"][1],
             }
         )
+
+        for layer_name, data in self.config.get("custom_layers", {}).items():
+            provider["layers"].append(
+                {
+                    "name": layer_name,
+                    "sql": data["query"],
+                    "geometry_type": data["geometry_type"],
+                }
+            )
+            m["layers"].append(
+                {
+                    "provider_layer": "%s.%s" % (self.PROVIDER_NAME, layer_name),
+                    "min_zoom": self.config["zoom_range"][0],
+                    "max_zoom": self.config["zoom_range"][1],
+                }
+            )
 
         # Construct config
         data = {
