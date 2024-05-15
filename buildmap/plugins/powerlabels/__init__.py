@@ -176,6 +176,9 @@ class PowerlabelsPlugin(object):
 
         # draw each node as a label
         for node in self.get_distros():
+            if node.name is None:
+                self.log.warn("Skipping label for node %s with no name", node.fid)
+                continue
             sheet.add_label(node)
 
         # save it
