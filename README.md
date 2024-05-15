@@ -1,6 +1,5 @@
 Buildmap
 ========
-[![CircleCI](https://circleci.com/gh/emfcamp/buildmap.svg?style=svg)](https://circleci.com/gh/emfcamp/buildmap)
 
 A GIS workflow pipeline for designing festivals. Buildmap has been
 used for [Electromagnetic Field](https://www.emfcamp.org),
@@ -12,7 +11,7 @@ PostGIS geodatabase as well as a tileserver configuration for rendering
 the map on the web. The recommended output format is [Mapbox
 Vector Tiles](https://docs.mapbox.com/vector-tiles/reference/) via 
 [Tegola](https://tegola.io/), for vector rendering with 
-[Mapbox GL JS](https://docs.mapbox.com/mapbox-gl-js/api/) or
+[Maplibre GL JS](https://maplibre.org/) or
 [OpenLayers](https://openlayers.org/).
 
 Buildmap has an extensible plugin system and [plugins exist](buildmap/plugins)
@@ -34,7 +33,7 @@ Installation
 
 Docker is the preferred deployment method for buildmap as it is quite
 sensitive to dependency versions. You can fetch the latest version
-with `docker pull russss/buildmap`.
+with `docker pull ghcr.io/emfcamp/buildmap:latest`.
 
 Source Files
 ============
@@ -45,7 +44,7 @@ Web Viewer
 ==========
 
 You will need a website with a javascript map viewer to view the
-generated tiles. Both OpenLayers 3 and Mapbox GL JS work well.
+generated tiles. Both OpenLayers 3 and Maplibre GL JS work well.
 
 Configuration
 =============

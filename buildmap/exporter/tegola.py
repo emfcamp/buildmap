@@ -9,6 +9,13 @@ def strip_srid(srid):
     return int(srid.replace("epsg:", ""))
 
 
+type_mapping = {
+    "multilinestring": "linestring",
+    "multipolygon": "polygon",
+    "multipoint": "point",
+}
+
+
 class TegolaExporter(Exporter):
     """Generate config for Tegola, which is a Mapbox Vector Tiles server.
 
@@ -42,8 +49,9 @@ class TegolaExporter(Exporter):
             # We can handle those in get_layer_sql
             types = self.db.get_layer_type(table_name, layer_name)
             if len(types) == 1:
-                typename = types[0].split("_")[1]
-                layer_name_typ = layer_name + "_" + typename.lower()
+                typename = types[0].split("_")[1].lower()
+                typename = type_mapping.get(typename, typename)
+                layer_name_typ = layer_name + "_" + typename
                 if sanitise_layer(layer_name_typ) in seen:
                     continue
                 seen.add(sanitise_layer(layer_name_typ))
@@ -56,8 +64,9 @@ class TegolaExporter(Exporter):
             else:
                 # Multiple simple types. Split them into different layers.
                 for typ in types:
-                    typename = typ.split("_")[1]
-                    layer_name_typ = layer_name + "_" + typename.lower()
+                    typename = typ.split("_")[1].lower()
+                    typename = type_mapping.get(typename, typename)
+                    layer_name_typ = layer_name + "_" + typename
                     if sanitise_layer(layer_name_typ) in seen:
                         continue
                     seen.add(sanitise_layer(layer_name_typ))
@@ -103,7 +112,7 @@ class TegolaExporter(Exporter):
         }
 
         if (
-            type(self.config["mapbox_vector_layer"]) is dict
+            isinstance(self.config["mapbox_vector_layer"], dict)
             and "attribution" in self.config["mapbox_vector_layer"]
         ):
             m["attribution"] = self.config["mapbox_vector_layer"]["attribution"]
@@ -141,12 +150,32 @@ class TegolaExporter(Exporter):
             }
         )
 
+        for layer_name, data in self.config.get("custom_layers", {}).items():
+            provider["layers"].append(
+                {
+                    "name": layer_name,
+                    "sql": data["query"],
+                    "geometry_type": data["geometry_type"],
+                }
+            )
+            m["layers"].append(
+                {
+                    "provider_layer": "%s.%s" % (self.PROVIDER_NAME, layer_name),
+                    "min_zoom": self.config["zoom_range"][0],
+                    "max_zoom": self.config["zoom_range"][1],
+                }
+            )
+
         # Construct config
         data = {
             "cache": {"type": "file", "basepath": "/tmp/tegola"},
             "providers": [provider],
             "maps": [m],
         }
+
+        if "uri_prefix" in self.config:
+            data["webserver"] = {"uri_prefix": self.config["uri_prefix"]}
+
         return data
 
     def get_layer_sql(self, table_name, layer_name, geometry_type):
@@ -160,9 +189,7 @@ class TegolaExporter(Exporter):
         """
         geom_field = "wkb_geometry"
         fid_field = "ogc_fid"
-        additional_fields = ["text", "entityhandle"] + list(
-            self.buildmap.known_attributes[table_name]
-        )
+        additional_fields = list(self.buildmap.known_attributes[table_name])
 
         for type_name in ("LineString", "Polygon"):
             if geometry_type == "ST_Multi{}".format(type_name):

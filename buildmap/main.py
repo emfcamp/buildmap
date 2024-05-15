@@ -8,12 +8,17 @@ import subprocess
 import time
 import argparse
 import importlib
+import requests
 from json.decoder import JSONDecodeError
 from collections import defaultdict
+from typing import Union
 from shapely.geometry import MultiPolygon, Polygon
+from pathlib import Path
+from mergedeep import merge
 
-from .util import sanitise_layer
+from .util import sanitise_layer, build_options
 from .mapdb import MapDB
+from .input import Input
 from . import plugins  # noqa
 
 
@@ -61,62 +66,58 @@ class BuildMap(object):
         self.bbox = None
 
         # Resolve any relative paths with respect to the first config file
-        self.base_path = os.path.dirname(os.path.abspath(self.args.config[0]))
+        self.base_path = Path(self.args.config[0]).absolute().parent
         self.temp_dir = self.resolve_path(self.config["output_directory"])
         self.known_attributes = defaultdict(set)
         shutil.rmtree(self.temp_dir, True)
-        try:
-            os.makedirs(self.temp_dir)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
 
     def load_config(self, config_files):
         config = {}
         for filename in config_files:
             try:
                 with open(filename, "r") as fp:
-                    config.update(json.load(fp))
+                    merge(config, json.load(fp))
             except JSONDecodeError as e:
                 raise Exception("Error loading config file {}: {}".format(filename, e))
         return config
 
-    def resolve_path(self, path):
-        return os.path.normpath(os.path.join(self.base_path, path))
+    def resolve_path(self, path: Union[str, Path]) -> Path:
+        return self.base_path / path
 
-    def import_dxf(self, dxf, table_name):
-        """Import the DXF into Postgres into the specified table name, overwriting the existing table."""
-        if not os.path.isfile(dxf):
-            raise Exception("Source DXF file %s does not exist" % dxf)
+    def import_file(self, input_file: Input):
+        """Import a geo file into Postgres into the specified table name, overwriting the existing table."""
 
-        self.log.info("Importing %s into PostGIS table %s...", dxf, table_name)
+        ogr_opts = {
+            "-t_srs": self.config["source_projection"],
+            "-nln": input_file.table,
+            "-f": "PostgreSQL",
+            "-lco": "GEOMETRY_NAME=wkb_geometry",
+            "-overwrite": None,
+        }
+
+        if input_file.file_type == "dxf":
+            ogr_opts["-s_srs"] = self.config["source_projection"]
+            ogr_opts["--config"] = [
+                ["DXF_ENCODING", "UTF-8"],
+                ["DXF_INCLUDE_RAW_CODE_VALUES", "TRUE"],
+            ]
+            ogr_opts["-sql"] = "SELECT *, OGR_STYLE FROM entities"
+
+        command = (
+            ["ogr2ogr"]
+            + list(build_options(ogr_opts))
+            + [
+                f"PG:{self.db.url.render_as_string(False)}?application_name=buildmap",
+                input_file.path,
+            ]
+        )
+
+        self.log.info(
+            "Importing %s into PostGIS table %s...", input_file.path, input_file.table
+        )
         try:
-            subprocess.check_call(
-                [
-                    "ogr2ogr",
-                    "--config",
-                    "DXF_ENCODING",
-                    "UTF-8",
-                    "--config",
-                    "DXF_INCLUDE_RAW_CODE_VALUES",
-                    "TRUE",
-                    "-s_srs",
-                    self.config["source_projection"],
-                    "-t_srs",
-                    self.config["source_projection"],
-                    "-sql",
-                    "SELECT *, OGR_STYLE FROM entities",
-                    "-nln",
-                    table_name,
-                    "-f",
-                    "PostgreSQL",
-                    "-lco",
-                    "GEOMETRY_NAME=wkb_geometry",
-                    "-overwrite",
-                    f"PG:{self.db.url}?application_name=buildmap",
-                    dxf,
-                ]
-            )
+            subprocess.check_call(command)
         except OSError as e:
             self.log.error("Unable to run ogr2ogr: %s", e)
             sys.exit(1)
@@ -129,21 +130,26 @@ class BuildMap(object):
         """
         results = []
         seen_layers = set()
+
         for table_name, source_file in self.config["source_file"].items():
             layer_order = source_file.get("layers", {})
+            rename_layers = source_file.get("rename_layers", {})
             file_layers = self.db.get_layers(table_name)
 
             for layer in layer_order:
+                layer = rename_layers.get(layer, layer)
                 if layer in file_layers and layer not in seen_layers:
                     seen_layers.add(layer)
                     results.append((table_name, layer))
 
         for table_name, source_file in self.config["source_file"].items():
+            rename_layers = source_file.get("rename_layers", {})
             file_layers = self.db.get_layers(table_name)
             # If we're configured to auto-import layers, add layers without a
             # defined order to the bottom of the layer order stack
             if source_file.get("auto_import_layers", False):
                 for layer in file_layers:
+                    layer = rename_layers.get(layer, layer)
                     if layer not in seen_layers:
                         seen_layers.add(layer)
                         results.insert(0, (table_name, layer))
@@ -202,33 +208,59 @@ class BuildMap(object):
         self.log.info("Generation complete in %.2f seconds", time.time() - start_time)
 
     def build_map(self):
-        #  Import each source DXF file into PostGIS
-        for table_name, source_file_data in self.config["source_file"].items():
-            if "path" not in source_file_data:
-                self.log.error("No path found for source %s", table_name)
-                return
-            path = self.resolve_path(source_file_data["path"])
-            self.import_dxf(path, table_name)
+        inputs = [
+            Input(self, table_name, conf)
+            for table_name, conf in self.config["source_file"].items()
+        ]
+        #  Import each source file into PostGIS
+        for input_file in inputs:
+            self.import_file(input_file)
 
         self.log.info(
             "Map bounds (N, E, S, W): %s", list(reversed(self.get_bbox().bounds))
         )
 
+        source_srid = self.config["source_projection"].split(":")[1]
+
         # Do some data transformation on the PostGIS table
         self.log.info("Transforming data...")
-        for table, tconfig in self.config["source_file"].items():
-            for layer in tconfig.get("combine_lines", []):
-                self.db.combine_lines(table, layer)
-            self.db.clean_layers(table)
-            if "handle_prefix" in tconfig:
-                self.db.prefix_handles(table, tconfig["handle_prefix"])
-            for layer in tconfig.get("force_polygon", []):
-                self.db.force_polygon(table, layer)
-            for layer in tconfig.get("smooth", []):
-                self.db.smooth(table, layer)
-            self.known_attributes[table] |= self.db.extract_attributes(table)
-
         self.db.create_bounding_layer("bounding_box", self.get_bbox())
+
+        for input_file in inputs:
+            # Remove entities which don't intersect the provided bounding box.
+            # If there's a manually-supplied bounding box this allows us to crop out stuff which we don't want,
+            # such as construction objects placed outside the map
+
+            # TODO: allow per-file bounding boxes here, as we may want to crop some inputs differently from others.
+            self.db.execute(
+                f"""DELETE FROM {input_file.table} WHERE
+                    NOT ST_Intersects(
+                        wkb_geometry,
+                        ST_Transform((SELECT wkb_geometry FROM bounding_box LIMIT 1), {source_srid})
+                    )"""
+            )
+            for layer in input_file.config.get("combine_lines", []):
+                self.db.combine_lines(input_file.table, layer)
+            if input_file.file_type == "dxf":
+                self.db.clean_dxf_table(input_file.table)
+            elif input_file.file_type == "geojson":
+                self.db.add_single_layer_column(input_file.table)
+            self.db.optimise_table(input_file.table)
+            if "handle_prefix" in input_file.config:
+                self.db.prefix_handles(
+                    input_file.table, input_file.config["handle_prefix"]
+                )
+            for layer in input_file.config.get("force_polygon", []):
+                self.db.force_polygon(input_file.table, layer)
+            for layer in input_file.config.get("smooth", []):
+                self.db.smooth(input_file.table, layer)
+            for layer_src, layer_dst in input_file.config.get(
+                "rename_layers", {}
+            ).items():
+                self.db.rename_layer(input_file.table, layer_src, layer_dst)
+            self.known_attributes[input_file.table] |= self.db.extract_attributes(
+                input_file
+            )
 
         for plugin, opts in self.config.get("plugins", {}).items():
             try:
@@ -283,3 +315,15 @@ class BuildMap(object):
         else:
             self.log.error("Requested static layer (%s) not found", self.args.layer)
             return
+
+    def download(self, remote_path: str):
+        """Download a remote file into the temp directory, and return the path"""
+        file_name = remote_path.split("/")[-1]
+        self.log.info("Downloading %s...", remote_path)
+        with requests.get(remote_path, stream=True) as r:
+            r.raise_for_status()
+            with open(self.temp_dir / file_name, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+        return self.temp_dir / file_name

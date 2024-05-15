@@ -1,43 +1,55 @@
-import os.path
 import json
+import logging
 from sqlalchemy import text
 from shapely import wkt
+from pathlib import Path
+from ...main import BuildMap
+from ...mapdb import MapDB
 
 
 class SearchPlugin(object):
     """Generate a JSON search index file to power JS search"""
 
-    def __init__(self, buildmap, _config, opts, db):
+    def __init__(self, buildmap: BuildMap, _config, opts, db: MapDB):
+        self.log = logging.getLogger(__name__)
         self.db = db
         self.buildmap = buildmap
         self.opts = opts
 
     def get_data(self):
         data = []
-        table = "site_plan"
+
+        layer_map = {layer: table for table, layer in self.buildmap.get_source_layers()}
 
         for layer in self.opts.get("layers", []):
-            cols = ["text"]
-            # Add any translated columns
-            cols += [
-                attr
-                for attr in self.buildmap.known_attributes[table]
-                if attr.startswith("text_")
-            ]
+            table = layer_map[layer["name"]]
+
+            cols = {layer["field"]} | set(layer.get("additional_columns", []))
+            cols = set(cols) & set(self.buildmap.known_attributes[table])
+
+            if len(cols) == 0:
+                raise ValueError("No searchable columns for layer %s" % layer)
 
             q = self.db.execute(
                 text(
                     """SELECT ST_AsText(ST_Transform(wkb_geometry, 4326)) AS geom, ogc_fid, %s
                         FROM %s
-                        WHERE layer = '%s' AND text IS NOT NULL AND text != ''"""
-                    % (",".join(cols), table, layer)
+                        WHERE layer = '%s' AND %s IS NOT NULL AND %s != ''"""
+                    % (
+                        ",".join(cols),
+                        table,
+                        layer["name"],
+                        layer["field"],
+                        layer["field"],
+                    )
                 )
             )
             for row in q:
-                point = wkt.loads(row["geom"])
+                geom = wkt.loads(row["geom"])
+                point = geom.representative_point()
                 record = {
-                    "gid": row["ogc_fid"],
-                    "layer": layer,
+                    "gid": f"{layer['name']}-{row['ogc_fid']}",
+                    "layer": layer["name"],
                     "position": [round(point.x, 5), round(point.y, 5)],
                 }
 
@@ -51,14 +63,14 @@ class SearchPlugin(object):
     def run(self):
         data = self.get_data()
 
-        out_path = os.path.join(
-            self.buildmap.resolve_path(self.buildmap.config["web_directory"]), "search"
+        out_path = self.buildmap.resolve_path(
+            self.opts.get(
+                "output_path",
+                Path(self.buildmap.config["web_directory"]) / "search" / "search.json",
+            )
         )
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        self.log.info("Generated search index with %s items", len(data))
 
-        try:
-            os.makedirs(out_path)
-        except FileExistsError:
-            pass
-
-        with open(os.path.join(out_path, "search.json"), "w") as f:
+        with out_path.open("w") as f:
             json.dump(data, f)

@@ -2,7 +2,9 @@ from typing import Optional
 from decimal import Decimal
 from functools import total_ordering
 from enum import Enum
-from . import unit
+import pint
+
+unit = pint.UnitRegistry()
 
 COUPLER_LOSS = Decimal("0.2")
 FIBRE_LOSS = Decimal("0.5")
@@ -15,17 +17,24 @@ class LinkType(Enum):
 
 
 @total_ordering
-class Switch:
+class Location:
     """The `cores_required` attribute indicates how many uplink
     cores this switch requires - usually 1 bidi link in our case."""
 
-    def __init__(self, name: str, cores_required: int = 1, deployed: bool = False):
+    def __init__(
+        self,
+        name: str,
+        handle: str,
+        cores_required: int = 1,
+        deployed: bool = False,
+    ):
         self.name = name
+        self.handle = handle
         self.cores_required = cores_required
         self.deployed = deployed
 
     def __repr__(self) -> str:
-        return "<Switch {}>".format(self.name)
+        return f"<Switch {self.name} (0x{self.handle})>"
 
     def __eq__(self, other):
         if type(other) != type(self):
@@ -47,18 +56,22 @@ class Switch:
 class Link:
     def __init__(
         self,
-        from_switch: Switch,
-        to_switch: Switch,
-        type: LinkType,
+        from_location: Location,
+        to_location: Location,
+        handle: str,
+        link_type: LinkType,
         length: int,
         cores: int,
         aggregated: bool,
         deployed: bool,
         fibre_name: Optional[str],
     ):
-        self.from_switch = from_switch
-        self.to_switch = to_switch
-        self.type = type
+        if type(link_type) != LinkType:
+            raise ValueError(f"Link type must be a LinkType enum, got {link_type}")
+        self.from_location = from_location
+        self.to_location = to_location
+        self.handle = handle
+        self.type = link_type
         self.length = length
         self.cores = cores
         self.cores_used = 0
@@ -67,9 +80,7 @@ class Link:
         self.deployed = deployed
 
     def __repr__(self) -> str:
-        return "<Link {from_switch} -> {to_switch} ({type})>".format(
-            from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
-        )
+        return f"<Link {self.from_location} -> {self.to_location} ({self.type.value}, handle 0x{self.handle})>"
 
 
 class LogicalLink:
@@ -78,11 +89,11 @@ class LogicalLink:
     patched/coupled through an intermediate location.
     """
 
-    def __init__(self, from_switch: Switch, to_switch: Switch, type):
-        self.from_switch = from_switch
-        self.to_switch = to_switch
+    def __init__(self, from_location: Location, to_location: Location, type):
+        self.from_location = from_location
+        self.to_location = to_location
         self.type = type
-        self.physical_links = []
+        self.physical_links: list[Link] = []
 
     @property
     def total_length(self) -> float:
@@ -111,5 +122,7 @@ class LogicalLink:
 
     def __repr__(self):
         return "<LogicalLink {from_switch} -> {to_switch} ({type})>".format(
-            from_switch=self.from_switch, to_switch=self.to_switch, type=self.type.value
+            from_switch=self.from_location,
+            to_switch=self.to_location,
+            type=self.type.value,
         )

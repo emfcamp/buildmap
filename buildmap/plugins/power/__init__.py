@@ -4,7 +4,8 @@ import re
 import powerplan
 import os.path
 from powerplan.diagram import to_dot
-from powerplan.bom import generate_bom_html
+from powerplan.bom import generate_bom_html, generate_bom_csvs
+from powerplan.test_schedules import generate_schedule_html
 from collections import namedtuple
 from sqlalchemy.sql import text
 
@@ -95,7 +96,7 @@ class PowerPlugin(object):
             yield Distro(
                 row["ogc_fid"],
                 get_key(row, "distro"),
-                get_key(row, "name"),
+                get_key(row, "name") or get_key(row, "entityhandle"),
                 get_key(row, "load"),
             )
 
@@ -127,7 +128,7 @@ class PowerPlugin(object):
         ):
             yield row[0], row[1], row[2]  # End node FID, connection layer, length
 
-    def generate_plan(self):
+    def generate_plan(self) -> powerplan.Plan:
         if self.opts.get("spec_dir"):
             spec = powerplan.EquipmentSpec(self.opts["spec_dir"])
         else:
@@ -215,7 +216,11 @@ class PowerPlugin(object):
             for err in errors:
                 self.log.warning("\t" + str(err))
 
-        plan.generate()
+        try:
+            plan.generate()
+        except Exception as e:
+            self.log.exception("Error generating power plan: %s", e)
+            return
 
         self.log.info("Plan validated in %.2f seconds", time.time() - start)
 
@@ -242,5 +247,16 @@ class PowerPlugin(object):
 
         with open(os.path.join(out_path, "power-bom.html"), "w") as f:
             f.write(generate_bom_html(plan))
+
+        try:
+            with open(os.path.join(out_path, "test-schedules.html"), "w") as f:
+                f.write(generate_schedule_html(plan))
+        except Exception as e:
+            self.log.exception("Error generating test schedules: %s", e)
+
+        with open(os.path.join(out_path, "cables-bom.csv"), "w") as cables, open(
+            os.path.join(out_path, "distros-bom.csv"), "w"
+        ) as distros:
+            generate_bom_csvs(plan, distros, cables)
 
         self.log.info("Power plans output to %s", out_path)
