@@ -36,7 +36,7 @@ setup(
         "pint==0.18",
         "reportlab",
         "pylabels",
-        "requests==2.31.0",
+        "requests==2.32.0",
     ],
     entry_points={"console_scripts": {"buildmap=buildmap.main:run"}},
 )
